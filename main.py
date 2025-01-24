@@ -1,10 +1,8 @@
 import numpy as np
-import copy
-import random
 from BoxEnv import Box, BoxMoveEnvironment
 
 # -------------------------------------------------
-# 1. Instantiate the environment
+# Environment and Initial State
 # -------------------------------------------------
 env = BoxMoveEnvironment(zone_sizes=[(2,3,4), (2,3,4)], horizon=3, gamma=1)
 
@@ -59,3 +57,50 @@ possible_actions = env.actions(initial_state)
 print("Possible Actions:")
 for act in possible_actions:
     print(f" - {act}")
+
+
+# -------------------------------------------------
+# NN Definition
+# -------------------------------------------------
+import torch
+import torch.nn as nn
+import torch.optim as optim
+from collections import deque
+
+class DQN(nn.Module):
+    def __init__(self, state_dim, action_dim):
+        super().__init__()
+        self.net = nn.Sequential(
+            nn.Linear(state_dim, 64),
+            nn.ReLU(),
+            nn.Linear(64, 64),
+            nn.ReLU(),
+            nn.Linear(64, action_dim)
+        )
+    def forward(self, x):
+        return self.net(x)
+
+
+# -------------------------------------------------
+# Epsilon Greedy Policy
+# -------------------------------------------------
+import random
+def select_action(dqn, state_vec, actions_list, epsilon=0.1):
+    """
+    - state_vec: 1D numpy array of shape (state_dim,)
+    - actions_list: all possible actions from env.actions(state)
+    - epsilon: exploration probability
+    """
+    if random.random() < epsilon:
+        # Explore: pick random action
+        return random.choice(actions_list)
+    else:
+        # Exploit: pick argmax Q
+        state_t = torch.tensor(state_vec, dtype=torch.float).unsqueeze(0)  # shape (1, state_dim)
+        # Evaluate Q-values for each possible action
+        q_vals = dqn(state_t)  # shape (1, action_dim)
+        _, best_action_idx = torch.max(q_vals, dim=1)
+        return actions_list[best_action_idx.item()]
+
+
+# -------------------------------------------------

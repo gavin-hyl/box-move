@@ -3,7 +3,7 @@ import copy
 
 DIM = 3
 STATE_DIM = 2*DIM + 1
-REMOVE_DIR = 0
+REMOVE_DIR = 2
 
 def setup(remove_ax):
     global REMOVE_DIR
@@ -176,14 +176,15 @@ class BoxMoveEnvironment:
             box2 = pair[STATE_DIM:]
             unmovable = box2 if Box.in_front(box1, box2) else box1
             unmovable_boxes.add(unmovable)
-        movable_boxes = set([tuple(b) for b in all_boxes]) - unmovable_boxes
+        moveable_boxes = set([tuple(b) for b in all_boxes]) - unmovable_boxes
+        moveable_boxes = [b for b in moveable_boxes if Box.zone(b) == 0]
         
-        for box in movable_boxes:
+        for box in moveable_boxes:
             # consider the action of moving a box to all possible positions
             start_pos = Box.pos(box)
             start_zone = Box.zone(box)
-            for zone in range(self.n_zones): # OR we can just consider the target zone
-                possible_end = np.zeros(DIM, dtype=int)
+            # for zone in range(self.n_zones): # OR we can just consider the target zone
+            for zone in [1]:
                 box_removed_state = copy.deepcopy(state)
                 Box.set_box(box_removed_state, Box.box_idx(state, start_pos, start_zone), Box.null_box())
                 for possible_end in self._zone_top_bottom(box_removed_state, zone)[0]:
@@ -233,6 +234,18 @@ class BoxMoveEnvironment:
 
     def reward(self):
         return 0 if not (self.t == self.horizon) else self.occupancy()
+
+    
+    def common_state_vec(self, state):
+        boxes = Box.boxes_from_state(state)
+        t = state[-1]
+        max_boxes = self.zone_sizes[0][0] * self.zone_sizes[0][1] * self.zone_sizes[0][2]
+        null_box = Box.null_box()
+        common_state = np.array([null_box for _ in range(max_boxes)], dtype=int)
+        for i, box in enumerate(boxes):
+            Box.set_box(common_state, i, box)
+        common_state[-1] = t
+        return common_state
 
 
     def _is_valid_action(self, state: np.array, action):

@@ -238,7 +238,7 @@ class BoxMoveEnvironment:
 
 
     def reward(self):
-        return 0 if not (self.t == self.horizon) else self.occupancy()
+        return self.occupancy()
 
     
     def common_state_vec(self, state):
@@ -476,18 +476,17 @@ class BoxMoveEnvGym(gym.Env):
         """
         super().reset(seed=seed)
 
-
         box0 = Box.make(np.array([0,0,0]), np.array([1,1,1]), 0)
         init_state = Box.state_from_boxes([box0], t=0)
 
         self.state = init_state
         # Return the flattened observation
-        return self._flatten_state(self.state)
+        return self._flatten_state(self.state), None
 
     def step(self, action_idx: int):
         """
         Applies the chosen action and steps the environment forward.
-        Gym step() returns (obs, reward, done, info).
+        Gym step() returns (obs, reward, done, truncated, info).
         """
         # 1. Map action_idx (0..max_possible_actions-1) to a valid MoveBox action.
         #    If action_idx >= len(_valid_actions), we treat it as "do nothing" or an invalid action.
@@ -526,7 +525,7 @@ class BoxMoveEnvGym(gym.Env):
         # 4. Build the next observation
         obs = self._flatten_state(self.state)
 
-        return obs, reward, done, info
+        return obs, reward, done, False, info
 
     def render(self, mode="human"):
         """

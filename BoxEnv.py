@@ -1,6 +1,11 @@
 import numpy as np
 import copy
 
+import numpy as np
+import gym
+from gym import spaces
+from copy import deepcopy
+
 DIM = 3
 STATE_DIM = 2*DIM + 1
 REMOVE_DIR = 2
@@ -392,3 +397,172 @@ class BoxMoveEnvironment:
                 occupancy += np.prod(box.size)
         occupancy /= np.prod(self.zone_sizes[zone])
         return occupancy
+
+
+
+class BoxMoveEnvGym(gym.Env):
+    """
+    A Gym-compatible wrapper for BoxMoveEnvironment.
+    """
+    metadata = {"render_modes": ["human"]}
+
+    def __init__(self, zone_sizes, horizon=100, gamma=1, max_boxes=10):
+        """
+        Args:
+            zone_sizes (list of np.array): dimension of each zone, e.g. [np.array([5,5,5]), np.array([5,5,5])]
+            horizon (int): maximum number of steps in an episode
+            gamma (float): discount factor (not directly used here for environment but relevant for RL)
+            max_boxes (int): maximum number of boxes your environment can have
+        """
+        super().__init__()
+        
+        # Create your internal environment
+        self.internal_env = BoxMoveEnvironment(zone_sizes, horizon, gamma)
+        self.horizon = horizon
+
+        # This environment has a discrete action space, but the number of possible actions
+        # changes each step. We'll handle that by setting an upper bound on possible actions.
+        # Then, at each step, we only allow as many actions as are actually valid.
+        # For example, let's set a generous maximum for the discrete action space:
+        self.max_possible_actions = 200  # some large number or user-defined
+
+        # In your environment, you define an observation as all box positions/sizes + time-step, etc.
+        # We'll need to flatten or embed that in a fixed-size vector. 
+        # We will define an upper bound for the dimension. 
+        # Example: Suppose each box is 2*DIM + 1 = 2*3 + 1 = 7 in your code.
+        # If you allow up to `max_boxes`, the naive flatten would be max_boxes * 7 + 1 (for time).
+        self.dim_per_box = STATE_DIM  # 7 in your code
+        self.flat_obs_dim = self.dim_per_box * max_boxes + 1  # +1 for time
+        # We'll build the final observation_space as a Box space:
+        # - A naive approach sets some numeric bounds. 
+        # - This is purely a toy bounding; you might want tighter bounds.
+        high = np.full((self.flat_obs_dim,), fill_value=999999, dtype=np.float32)
+        self.observation_space = spaces.Box(
+            low=-high, high=high, shape=(self.flat_obs_dim,), dtype=np.float32
+        )
+
+        # The action space is a single integer in [0, max_possible_actions - 1].
+        # We'll map that integer to a valid MoveBox action at runtime.
+        self.action_space = spaces.Discrete(self.max_possible_actions)
+
+        # We will hold onto the *actual* valid actions in this list each step:
+        self._valid_actions = []
+
+        # We store the environment's state as a numpy array (like your environment).
+        # But we also keep track of the "raw" BoxMoveEnvironment internal state.
+        # We'll define a default initial state or a reset function that sets it.
+        self.state = None
+
+    def _flatten_state(self, state: np.array) -> np.array:
+        """
+        Given the environment's `state` (which is [box_1, box_2, ..., box_n, time]),
+        convert it into a fixed-size 1D float32 array.
+        If there are fewer than max_boxes, we pad with null boxes. 
+        If more, you should define how to handle that—this is domain-specific.
+        """
+        boxes = Box.boxes_from_state(state)
+        t = state[-1]
+
+        # Build a new array that can hold up to max_boxes boxes:
+        flattened = np.zeros(self.flat_obs_dim, dtype=np.float32)
+
+        # Each box has self.dim_per_box entries, plus the last entry is time.
+        # Fill in the actual boxes, up to `max_boxes`.
+        for i, b in enumerate(boxes):
+            if i >= self._max_boxes:
+                # if we exceed max_boxes, break or handle it some way
+                break
+            start_idx = i * self.dim_per_box
+            end_idx = start_idx + self.dim_per_box
+            flattened[start_idx:end_idx] = b  # b is length self.dim_per_box
+
+        # Place time as the last entry
+        flattened[-1] = float(t)
+        return flattened
+
+    def _compute_valid_actions(self, state: np.array):
+        """
+        Compute the valid actions from the underlying environment's `actions(...)`.
+        Returns a list of MoveBox objects.
+        """
+        return self.internal_env.actions(state)
+
+    def reset(self, seed=None, options=None):
+        """
+        Resets the environment to a start state.
+        """
+        super().reset(seed=seed)
+
+        # For your environment, you might want to build an initial arrangement of boxes:
+        # e.g., let's create a single box in zone=0
+        # This is highly domain-specific. Adjust as needed.
+        # Suppose we want 1 box at position (0,0,0), size(1,1,1), zone=0, time=0
+        box0 = Box.make(np.array([0,0,0]), np.array([1,1,1]), 0)
+        init_state = Box.state_from_boxes([box0], t=0)
+
+        # Alternatively, you might randomize positions, sizes, etc.:
+        # (your call if you want random initial states)
+
+        self.state = init_state
+        # Return the flattened observation
+        return self._flatten_state(self.state)
+
+    def step(self, action_idx: int):
+        """
+        Applies the chosen action and steps the environment forward.
+        Gym step() returns (obs, reward, done, info).
+        """
+        # 1. Map action_idx (0..max_possible_actions-1) to a valid MoveBox action.
+        #    If action_idx >= len(_valid_actions), we treat it as "do nothing" or an invalid action.
+        valid_actions = self._compute_valid_actions(self.state)
+        self._valid_actions = valid_actions  # store them for debugging / reference
+
+        if len(valid_actions) == 0:
+            # No valid moves, so let's define a 'null' action => environment does not change
+            # You might also consider forcing done = True, or giving a penalty.
+            next_state = deepcopy(self.state)
+            reward = 0
+            done = True
+            info = {"reason": "no_valid_moves"}
+        else:
+            if action_idx >= len(valid_actions):
+                # Chosen an invalid action index => can penalize or do nothing
+                chosen_action = None
+                # We'll just skip and do "no-op"
+                next_state = deepcopy(self.state)
+                reward = -1.0  # for example
+                done = False
+                info = {"reason": "invalid_action_index"}
+            else:
+                chosen_action = valid_actions[action_idx]
+                # 2. Step the environment using your internal_env.step(...)
+                next_state, step_reward, done = self.internal_env.step(self.state, chosen_action)
+
+                # If you'd like to shape rewards or customize them:
+                # e.g. we can track how much occupancy changed in zone=1, etc.
+                reward = step_reward  # your environment returns 0 or occupancy if done, etc.
+                info = {"chosen_action": str(chosen_action)}
+
+        # 3. Update self.state
+        self.state = next_state
+
+        # 4. Build the next observation
+        obs = self._flatten_state(self.state)
+
+        return obs, reward, done, info
+
+    def render(self, mode="human"):
+        """
+        Optional: Provide any rendering of the environment state if you want.
+        """
+        print("State:", Box.to_str(self.state))
+        if len(self._valid_actions) > 0:
+            print("Valid actions:", [str(a) for a in self._valid_actions])
+        else:
+            print("No valid actions")
+
+    def close(self):
+        """
+        Clean up if needed.
+        """
+        pass

@@ -418,39 +418,23 @@ class BoxMoveEnvGym(gym.Env):
         
         # Create your internal environment
         self.internal_env = BoxMoveEnvironment(zone_sizes, horizon, gamma)
+        self._max_boxes = zone_sizes[0][0] * zone_sizes[0][1] * zone_sizes[0][2]
         self.horizon = horizon
-
-        # This environment has a discrete action space, but the number of possible actions
-        # changes each step. We'll handle that by setting an upper bound on possible actions.
-        # Then, at each step, we only allow as many actions as are actually valid.
-        # For example, let's set a generous maximum for the discrete action space:
-        self.max_possible_actions = 200  # some large number or user-defined
-
-        # In your environment, you define an observation as all box positions/sizes + time-step, etc.
-        # We'll need to flatten or embed that in a fixed-size vector. 
-        # We will define an upper bound for the dimension. 
-        # Example: Suppose each box is 2*DIM + 1 = 2*3 + 1 = 7 in your code.
-        # If you allow up to `max_boxes`, the naive flatten would be max_boxes * 7 + 1 (for time).
+        self.max_possible_actions = 200
         self.dim_per_box = STATE_DIM  # 7 in your code
         self.flat_obs_dim = self.dim_per_box * max_boxes + 1  # +1 for time
+
         # We'll build the final observation_space as a Box space:
         # - A naive approach sets some numeric bounds. 
-        # - This is purely a toy bounding; you might want tighter bounds.
         high = np.full((self.flat_obs_dim,), fill_value=999999, dtype=np.float32)
         self.observation_space = spaces.Box(
             low=-high, high=high, shape=(self.flat_obs_dim,), dtype=np.float32
         )
 
-        # The action space is a single integer in [0, max_possible_actions - 1].
-        # We'll map that integer to a valid MoveBox action at runtime.
         self.action_space = spaces.Discrete(self.max_possible_actions)
 
-        # We will hold onto the *actual* valid actions in this list each step:
         self._valid_actions = []
 
-        # We store the environment's state as a numpy array (like your environment).
-        # But we also keep track of the "raw" BoxMoveEnvironment internal state.
-        # We'll define a default initial state or a reset function that sets it.
         self.state = None
 
     def _flatten_state(self, state: np.array) -> np.array:
@@ -458,7 +442,6 @@ class BoxMoveEnvGym(gym.Env):
         Given the environment's `state` (which is [box_1, box_2, ..., box_n, time]),
         convert it into a fixed-size 1D float32 array.
         If there are fewer than max_boxes, we pad with null boxes. 
-        If more, you should define how to handle that—this is domain-specific.
         """
         boxes = Box.boxes_from_state(state)
         t = state[-1]
@@ -493,15 +476,9 @@ class BoxMoveEnvGym(gym.Env):
         """
         super().reset(seed=seed)
 
-        # For your environment, you might want to build an initial arrangement of boxes:
-        # e.g., let's create a single box in zone=0
-        # This is highly domain-specific. Adjust as needed.
-        # Suppose we want 1 box at position (0,0,0), size(1,1,1), zone=0, time=0
+
         box0 = Box.make(np.array([0,0,0]), np.array([1,1,1]), 0)
         init_state = Box.state_from_boxes([box0], t=0)
-
-        # Alternatively, you might randomize positions, sizes, etc.:
-        # (your call if you want random initial states)
 
         self.state = init_state
         # Return the flattened observation

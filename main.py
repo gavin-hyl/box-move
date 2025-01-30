@@ -4,16 +4,13 @@ from stable_baselines3 import DQN
 from stable_baselines3.dqn import MlpPolicy
 
 def main():
-    # Example zone sizes
     zone_sizes = [
-        np.array([5, 5, 5], dtype=int),  # zone 0
-        np.array([5, 5, 5], dtype=int)   # zone 1
+        np.array([5, 5, 5], dtype=int),
+        np.array([5, 5, 5], dtype=int)
     ]
 
-    # Create the Gym environment
     env = BoxMoveEnvGym(zone_sizes=zone_sizes, horizon=20, max_boxes=5)
 
-    # Create a DQN model (with default MLP policy)
     model = DQN(
         policy=MlpPolicy,
         env=env,
@@ -30,7 +27,6 @@ def main():
         target_update_interval=500
     )
 
-    # Train the model
     model.learn(total_timesteps=50000)
 
     # Test the trained agent

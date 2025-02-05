@@ -1,4 +1,4 @@
-from BoxEnv import BoxMoveEnvironment, Box, STATE_DIM
+from Core import BoxMoveEnvironment, Box, STATE_DIM
 
 import numpy as np
 
@@ -24,7 +24,7 @@ class BoxMoveEnvGym(gym.Env):
         super().__init__()
         
         # Create your internal environment
-        self.internal_env = BoxMoveEnvironment(zone_sizes, horizon, gamma)
+        self.internal_env = BoxMoveEnvironment(horizon, gamma)
         self._max_boxes = zone_sizes[0][0] * zone_sizes[0][1] * zone_sizes[0][2]
         self.horizon = horizon
         self.max_possible_actions = 200

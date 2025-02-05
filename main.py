@@ -1,5 +1,5 @@
 import numpy as np
-from BoxEnv import BoxMoveEnvGym
+from BoxGymEnv import BoxMoveEnvGym
 from stable_baselines3 import DQN
 from stable_baselines3.dqn import MlpPolicy
 
@@ -27,14 +27,14 @@ def main():
         target_update_interval=500
     )
 
-    model.learn(total_timesteps=50000)
+    model.learn(total_timesteps=5000)
 
     # Test the trained agent
-    obs = env.reset()
+    obs = env.reset()[0]
     done = False
     while not done:
         action, _states = model.predict(obs, deterministic=True)
-        obs, reward, done, info = env.step(action)
+        obs, reward, done, truncated, info = env.step(action)
         env.render()
         print(f"Action: {action}, Reward: {reward}, Done: {done}")
 

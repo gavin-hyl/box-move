@@ -28,14 +28,10 @@ def dense_action(state, action: BoxAction):
 
 
 if __name__ == '__main__':
-    state = Box.state_from_boxes([
-        Box.make([0, 0, 0], [1, 1, 3], 0),
-        Box.make([1, 0, 0], [1, 1, 1], 0),
-        Box.make([0, 1, 0], [1, 1, 1], 0),
-    ])
-    print("Initial State:")
-    print(dense_state(state)[0])
-    actions = Core.actions(state)
+    print("Random Initial State:")
+    st = Core.random_initial_state(3)
+    print(dense_state(st)[0])
+    actions = Core.actions(st)
     print("Sample Action:")
-    for rep in dense_action(state, actions[0]):
+    for rep in dense_action(st, actions[0]):
         print(rep)

@@ -17,7 +17,13 @@ def zone(box, zone=None):
     return box[2*DIM]
 
 def make(p, s, zone):
-    return np.concatenate((p, s, [zone]))
+    rep = np.zeros(STATE_DIM, dtype=int)
+    for i, x in enumerate(p):
+        rep[i] = x
+    for i, x in enumerate(s):
+        rep[i + DIM] = x
+    rep[2*DIM] = zone
+    return rep
 
 def access_from_state(state, idx, new_box=None):
     """ Returns the box at the given index in the state vector. """
@@ -25,18 +31,6 @@ def access_from_state(state, idx, new_box=None):
     if new_box is not None:
         state[idx:idx + STATE_DIM] = new_box
     return state[idx:idx + STATE_DIM]
-
-
-def get_box(state, idx):
-    """ Returns the box at the given index in the state vector. """
-    idx *= STATE_DIM
-    return state[idx:idx+STATE_DIM]
-
-
-def set_box(state, idx, box):
-    """ Sets the box at the given index in the state vector. """
-    idx *= STATE_DIM
-    state[idx:idx+STATE_DIM] = box
 
 
 def boxes_from_state(state):
@@ -51,7 +45,7 @@ def state_from_boxes(boxes, t=0):
     """ Creates a state vector from a list of boxes and a time step. """
     state = np.zeros(len(boxes) * (STATE_DIM) + 1, dtype=int)
     for i, box in enumerate(boxes):
-        set_box(state, i, box)
+        access_from_state(state, i, box)
     state[-1] = t
     return state
 

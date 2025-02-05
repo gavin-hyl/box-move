@@ -215,20 +215,19 @@ def random_initial_state(n_boxes, zone=0):
     """
     boxes = []
     tries = 0
-    max_tries = 500  # Just to prevent infinite loops
+    max_tries = 500
     while len(boxes) < n_boxes and tries < max_tries:
         tries += 1
-        # Random size (at least 1 cell in each dimension)
-        x_size = np.random.randint(1, 2)
-        y_size = np.random.randint(1, 2)
-        z_size = np.random.randint(1, 2)
+        x_size = np.random.randint(1, ZONE0[0])
+        y_size = np.random.randint(1, ZONE0[1])
+        z_size = np.random.randint(1, ZONE0[2])
         # Random position ensuring the box fits
         x_pos = np.random.randint(0, ZONE0[0] - x_size + 1)
         y_pos = np.random.randint(0, ZONE0[1] - y_size + 1)
         z_pos = np.random.randint(0, ZONE0[2] - z_size + 1)
         candidate_box = Box.make(
-            pos=np.ndarray([x_pos, y_pos, z_pos]),
-            size=np.ndarray([x_size, y_size, z_size]),
+            p=[x_pos, y_pos, z_pos],
+            s=[x_size, y_size, z_size],
             zone=zone
         )
         # Test if adding this new box is still a valid state
@@ -237,8 +236,8 @@ def random_initial_state(n_boxes, zone=0):
         if _is_valid_state(test_state):
             boxes.append(candidate_box)
     # Create the final state from whatever valid boxes we have
-    state = Box.state_from_boxes(boxes, t=0)
-    return state
+    return Box.state_from_boxes(boxes, t=0)
+
 
 class BoxMoveEnvironment:
     def __init__(self, horizon=100, gamma=1):

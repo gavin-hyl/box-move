@@ -5,8 +5,9 @@
 - This environment is designed following a (deterministic) MDP structure. The task is to move boxes from one zone to another. 
 - Given $n$ boxes, the vector representation for each box is $7$ long: $(p, s, z)$ where $p$ is the position, $s$ is the size (also a $3$-vector), and $z$ is zone the box is currently in. 
 - The state vector combines all boxes in no particular order. It also records the timestep of the current state, which gives a $7n+1$ long state vector. 
-- The action set at every step includes all actions that take accessible boxes (those that are unobstructed in the `remove_ax` direction) to an accessible location (unobstructed in `remove_ax`, and all points on the bottom are supported by other boxes). Note that this includes actions from the same zone to itself. The actions are objects with attributes $(p_i, z_i, p_f, z_f)$ (should convert to np arrays!)
+- The action set at every step includes all actions that take accessible boxes (those that are unobstructed in the `remove_ax` direction) to an accessible location (unobstructed in `remove_ax`, and all points on the bottom are supported by other boxes). Note that this includes actions from the same zone to itself. The actions are objects with attributes $(p_i, z_i, p_f, z_f)$
 - The reward is given by the occupancy of the target zone, which is computed as the ratio of volume of boxes to the volume of the zone
+- (`Dense` documentation)
 
 
 ## Usage

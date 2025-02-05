@@ -11,7 +11,10 @@ def dense_zone(zone: int):
 def dense_state(state: np.ndarray):
     """ When printed, the outermost layer represents x, down represents y, and right represents z. """
     representations = [dense_zone(i) for i in [0, 1]]
+    null = Box.null_box()
     for idx, box in enumerate(Box.boxes_from_state(state)):
+        if box == null:
+            continue
         p, s, zone = Box.pos(box), Box.size(box), Box.zone(box)
         for x in range(p[0], p[0] + s[0]):
             for y in range(p[1], p[1] + s[1]):

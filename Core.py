@@ -46,7 +46,7 @@ def actions(state: np.ndarray):
     return actions
 
 
-def transition(curr_state, action):
+def transition(curr_state, action, step_time=False):
     """Computes the next state of the environment given an action.
 
     Args:
@@ -61,6 +61,8 @@ def transition(curr_state, action):
     Box.pos(box_state, action.pos_to)
     Box.zone(box_state, action.zone_to)
     Box.access_from_state(state, idx, box_state)
+    if step_time:
+        state[-1] += 1
     return state
 
 def _is_valid_action(state: np.ndarray, action):
@@ -237,36 +239,3 @@ def random_initial_state(n_boxes, zone=0):
             boxes.append(candidate_box)
     # Create the final state from whatever valid boxes we have
     return Box.state_from_boxes(boxes, t=0)
-
-
-class BoxMoveEnvironment:
-    def __init__(self, horizon=100, gamma=1):
-        self.horizon = horizon
-        self.gamma = gamma
-
-    def actions(self, state: np.ndarray):
-        return actions(state)
-    
-
-    def step(self, state: np.ndarray, action: BoxAction):
-        """
-        Takes a step in the simulator.
-
-        Args:
-            state (np.ndarray): the current state of the environment.
-            action (BoxAction): the action to take.
-        
-        Returns:
-            tuple: a tuple containing the next state of the environment, the
-            reward received from taking the action, and a boolean indicating
-            whether the episode has ended.
-        """
-        state = self.transition(state, action)
-        state[-1] += 1
-        if state[-1] == self.horizon:
-            return state, self.reward(), True
-        else:
-            return state, 0, False
-    
-    def reward(self):
-        return self.occupancy()

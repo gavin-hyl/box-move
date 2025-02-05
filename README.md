@@ -9,6 +9,9 @@
 - The reward is given by the occupancy of the target zone, which is computed as the ratio of volume of boxes to the volume of the zone
 - (`Dense` documentation)
 
+## Ideas
+- Partially observable state (only the outermost accessible layer is seen)
+
 
 ## Usage
 ```py

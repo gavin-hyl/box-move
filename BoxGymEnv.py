@@ -1,7 +1,7 @@
 import Box
 from Dense import dense_state, dense_action
 from Constants import DIM, STATE_DIM, REMOVE_DIR, ZONE_SIZES, ZONE0, ZONE1
-from Core import random_initial_state, actions, transition, occupancy
+import Core
 
 import numpy as np
 
@@ -16,7 +16,7 @@ class BoxMoveEnvGym(gym.Env):
     """
     metadata = {"render_modes": ["human"]}
 
-    def __init__(self, horizon=100, gamma=1):
+    def __init__(self, horizon=100, gamma=1, n_boxes=5):
         """
         Args:
             horizon (int): maximum number of steps in an episode
@@ -31,17 +31,19 @@ class BoxMoveEnvGym(gym.Env):
         # Required by Gym
         high = np.full((flat_obs_dim,), fill_value=max_boxes, dtype=int)
         self.observation_space = spaces.Box(
-            low=-high, high=high, shape=(self.flat_obs_dim,), dtype=int
+            low=-high, high=high, shape=(flat_obs_dim,), dtype=int
         )
         self.action_space = spaces.Discrete(max_possible_actions)
-        self.state = None
+        self.gamma = gamma
+        self.state = Core.random_initial_state(n_boxes)
+        self._n_boxes = n_boxes
 
     def reset(self, seed=None, options=None):
         """
         Resets the environment to a start state.
         """
         super().reset(seed=seed)
-        self.state = random_initial_state(10)
+        self.state = Core.pad_boxes(Core.random_initial_state(self._n_boxes))
         return self.state, None
 
     def step(self, action_idx: int):
@@ -49,29 +51,25 @@ class BoxMoveEnvGym(gym.Env):
         Applies the chosen action and steps the environment forward.
         Gym step() returns (obs, reward, terminated, truncated, info).
         """
-        valid_actions = actions(self.state)
+        valid_actions = Core.actions(self.state)
+        all_actions = Core.all_actions()
+        terminated, truncated = False, False
         if not valid_actions:
-            next_state = deepcopy(self.state)
             reward = 0
             terminated = True
-            truncated = False
             info = {"reason": "no_valid_moves"}
         else:
-            terminated = False
             truncated = self.horizon == self.state[-1]
-            if action_idx >= len(valid_actions):
-                chosen_action = None
-                next_state = deepcopy(self.state)
+            if action_idx >= len(all_actions) or (chosen_action := all_actions[action_idx]) not in valid_actions:
+                terminated = True
                 reward = -1.0
                 info = {"reason": "invalid_action_index"}
             else:
-                chosen_action = valid_actions[action_idx]
-                next_state = transition(self.state, chosen_action, step_time=True)
-                reward = occupancy(next_state)  # placeholder reward
+                self.state = Core.transition(self.state, chosen_action, step_time=True)
+                reward = Core.occupancy(self.state)  # placeholder reward
                 info = {"chosen_action": str(chosen_action)}
-
-        self.state = next_state
         obs = self.state
+
         return obs, reward, terminated, truncated, info
 
 

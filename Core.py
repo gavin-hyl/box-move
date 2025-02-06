@@ -239,3 +239,20 @@ def random_initial_state(n_boxes, zone=0):
             boxes.append(candidate_box)
     # Create the final state from whatever valid boxes we have
     return Box.state_from_boxes(boxes, t=0)
+
+
+def all_actions():
+    all_xns = []
+    for from_pos in np.ndindex(ZONE0):
+        for to_pos in np.ndindex(ZONE1):
+            all_xns.append(BoxAction(from_pos, to_pos, 0, 1))
+    return all_xns
+
+def pad_boxes(state, n_boxes=None):
+    """Pads the state with null boxes to reach n_boxes."""
+    if n_boxes is None:
+        n_boxes = np.prod(ZONE0)
+    boxes = Box.boxes_from_state(state)
+    while len(boxes) < n_boxes:
+        boxes.append(Box.null_box())
+    return Box.state_from_boxes(boxes, state[-1])

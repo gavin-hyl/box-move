@@ -2,14 +2,11 @@ import numpy as np
 from BoxGymEnv import BoxMoveEnvGym
 from stable_baselines3 import DQN
 from stable_baselines3.dqn import MlpPolicy
+from Core import _is_valid_action
+import Dense
 
 def main():
-    zone_sizes = [
-        np.array([5, 5, 5], dtype=int),
-        np.array([5, 5, 5], dtype=int)
-    ]
-
-    env = BoxMoveEnvGym(zone_sizes=zone_sizes, horizon=20, max_boxes=5)
+    env = BoxMoveEnvGym(horizon=20)
 
     model = DQN(
         policy=MlpPolicy,
@@ -34,9 +31,13 @@ def main():
     done = False
     while not done:
         action, _states = model.predict(obs, deterministic=True)
+        if not _is_valid_action(env.state, action):
+            print("Invalid action")
+            break
+        print(f"Action: {Dense.dense_action(env.state, action)}")
+        print(f"State: {Dense.dense_state(env.state)}")
         obs, reward, done, truncated, info = env.step(action)
-        env.render()
-        print(f"Action: {action}, Reward: {reward}, Done: {done}")
+    print(f"Dense state: {Dense.dense_state(env.state)}")
 
 if __name__ == "__main__":
     main()

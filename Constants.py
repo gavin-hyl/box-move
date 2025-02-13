@@ -1,6 +1,6 @@
 import numpy as np
-DIM = 3
-STATE_DIM = 2*DIM + 1
+GEO_DIM = 3
+BOX_DIM = 2*GEO_DIM + 1
 REMOVE_DIR = 2  # 0, 1, 2 for x, y, z
 ZONE0 = (3, 2, 2)
 ZONE1 = (2, 3, 2)

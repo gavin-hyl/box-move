@@ -2,7 +2,7 @@ import numpy as np
 import copy
 import Box
 from BoxAction import BoxAction
-from Constants import DIM, STATE_DIM, REMOVE_DIR, ZONE_SIZES, ZONE0, ZONE1
+from Constants import GEO_DIM, BOX_DIM, REMOVE_DIR, ZONE_SIZES, ZONE0, ZONE1
 
 
 def actions(state: np.ndarray):
@@ -23,8 +23,8 @@ def actions(state: np.ndarray):
     collisions |= _collision_pairs_2d(zone_boxes, zone_boxes, proj_dim=REMOVE_DIR)
     unmovable_boxes = set()
     for pair in collisions:
-        box1 = pair[:STATE_DIM]
-        box2 = pair[STATE_DIM:]
+        box1 = pair[:BOX_DIM]
+        box2 = pair[BOX_DIM:]
         unmovable = box2 if Box.in_front(box1, box2) else box1
         unmovable_boxes.add(unmovable)
     moveable_boxes = set([tuple(b) for b in all_boxes]) - unmovable_boxes
@@ -47,13 +47,7 @@ def actions(state: np.ndarray):
 
 
 def transition(curr_state, action, step_time=False):
-    """Computes the next state of the environment given an action.
-
-    Args:
-        action (BoxAction): the action to take.
-
-    Returns:
-        np.ndarray: the next state of the environment.
+    """Computes the next state of the environment given an action. Assumes the action is valid.
     """
     state = copy.deepcopy(curr_state)
     idx = Box.box_idx(state, action.pos_from, action.zone_from)
@@ -76,6 +70,8 @@ def _is_valid_action(state: np.ndarray, action):
     Returns:
         bool: True if the action is valid, False otherwise.
     """
+    if Box.box_idx(state, action.pos_from, action.zone_from) == -1:
+        return False
     new_state = transition(state, action)
     orig_box = Box.access_from_state(state, Box.box_idx(state, action.pos_from, action.zone_from))
     new_box = Box.make(action.pos_to, Box.size(orig_box), action.zone_to)
@@ -89,8 +85,8 @@ def _is_valid_action(state: np.ndarray, action):
     # check if the target position can be reached
     col_pairs_2d = _collision_pairs_2d([new_box], new_boxes, proj_dim=REMOVE_DIR)
     for pair in col_pairs_2d:
-        box1 = pair[:STATE_DIM]
-        box2 = pair[STATE_DIM:]
+        box1 = pair[:BOX_DIM]
+        box2 = pair[BOX_DIM:]
         if (box1 == new_box).all() and Box.in_front(box2, box1):
             return False
         elif (box2 == new_box).all() and Box.in_front(box1, box2):
@@ -123,7 +119,7 @@ def _collision_pairs_2d(group1, group2, proj_dim):
     """ Computes the pairs of boxes that collide on a given plane defined by the normal direction in proj_dim. """
     pairs = set()
     added = False
-    for i in range(DIM):
+    for i in range(GEO_DIM):
         if i == proj_dim:
             continue
         if not added:

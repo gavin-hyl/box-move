@@ -1,13 +1,12 @@
 import Box
 from Dense import dense_state, dense_action
-from Constants import DIM, STATE_DIM, REMOVE_DIR, ZONE_SIZES, ZONE0, ZONE1
+from Constants import GEO_DIM, BOX_DIM, REMOVE_DIR, ZONE_SIZES, ZONE0, ZONE1
 import Core
 
 import numpy as np
 
 import gym
 from gym import spaces
-from copy import deepcopy
 
 
 class BoxMoveEnvGym(gym.Env):
@@ -26,7 +25,7 @@ class BoxMoveEnvGym(gym.Env):
         self.horizon = horizon
         max_boxes = np.prod(ZONE0)
         max_possible_actions = max_boxes * np.prod(ZONE1)
-        flat_obs_dim = STATE_DIM * max_boxes + 1  # +1 for time
+        flat_obs_dim = BOX_DIM * max_boxes + 1  # +1 for time
 
         # Required by Gym
         high = np.full((flat_obs_dim,), fill_value=max_boxes, dtype=int)

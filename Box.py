@@ -1,54 +1,59 @@
 import numpy as np
-from Constants import DIM, STATE_DIM, REMOVE_DIR
+from Constants import GEO_DIM, BOX_DIM, REMOVE_DIR
 
 
 def pos(box, p=None):
+    if len(box) != BOX_DIM:
+        print(f"Box: {box}")
+        raise ValueError(f"Box must be of length {BOX_DIM}, not {len(box)}")
     if p is not None:
-        box[:DIM] = p
-    return box[:DIM]
+        box[:GEO_DIM] = p
+    return box[:GEO_DIM]
 
 
 def size(box, size=None):
     if size is not None:
-        box[DIM : 2 * DIM] = size
-    return box[DIM : 2 * DIM]
+        box[GEO_DIM : 2 * GEO_DIM] = size
+    return box[GEO_DIM : 2 * GEO_DIM]
 
 
 def zone(box, zone=None):
     if zone is not None:
-        box[2 * DIM] = zone
-    return box[2 * DIM]
+        box[2 * GEO_DIM] = zone
+    return box[2 * GEO_DIM]
 
 
 def make(p, s, zone):
-    rep = np.zeros(STATE_DIM, dtype=int)
+    rep = np.zeros(BOX_DIM, dtype=int)
     for i, x in enumerate(p):
         rep[i] = x
     for i, x in enumerate(s):
-        rep[i + DIM] = x
-    rep[2 * DIM] = zone
+        rep[i + GEO_DIM] = x
+    rep[2 * GEO_DIM] = zone
     return rep
 
 
 def access_from_state(state, idx, new_box=None):
     """Returns the box at the given index in the state vector."""
-    idx *= STATE_DIM
+    idx *= BOX_DIM
+    if idx < 0 or idx >= len(state) - 1:
+        raise ValueError(f"Index {idx} out of bounds for state of length {len(state)}")
     if new_box is not None:
-        state[idx : idx + STATE_DIM] = new_box
-    return state[idx : idx + STATE_DIM]
+        state[idx : idx + BOX_DIM] = new_box
+    return state[idx : idx + BOX_DIM]
 
 
 def boxes_from_state(state):
     """Extracts a list of boxes from a state vector."""
     boxes = []
-    for i in range(0, len(state) - 1, STATE_DIM):
-        boxes.append(state[i : i + STATE_DIM])
+    for i in range(0, len(state) - 1, BOX_DIM):
+        boxes.append(state[i : i + BOX_DIM])
     return boxes
 
 
 def state_from_boxes(boxes, t=0):
     """Creates a state vector from a list of boxes and a time step."""
-    state = np.zeros(len(boxes) * (STATE_DIM) + 1, dtype=int)
+    state = np.zeros(len(boxes) * (BOX_DIM) + 1, dtype=int)
     for i, box in enumerate(boxes):
         access_from_state(state, i, box)
     state[-1] = t
@@ -75,7 +80,7 @@ def to_str(state):
 def key_from_pair(box1, box2):
     """Returns a hashable key for a pair of boxes."""
     box1_first = False
-    for i in range(STATE_DIM):
+    for i in range(BOX_DIM):
         box1_first = box1[i] < box2[i]
         if box1[i] != box2[i]:
             break
@@ -93,7 +98,12 @@ def in_front(box1, box2):
 
 def null_box():
     """Creates a box that is not valid for placeholding."""
-    return make(np.zeros(DIM), np.zeros(DIM), -1)
+    return make(np.zeros(GEO_DIM), np.zeros(GEO_DIM), -1)
+
+
+def is_null(box):
+    """Checks if the box is null."""
+    return (box == null_box()).all()
 
 
 def top_and_bottom(box):
@@ -107,3 +117,24 @@ def top_and_bottom(box):
             bottom_points.add(tuple(p + np.array([i, j, 0])))
             top_points.add(tuple(p + np.array([i, j, s[2]])))
     return top_points, bottom_points
+
+
+def top_face(box):
+    """ Returns a set of points representing the top face of the box. Each tile is represented by its bottom-left corner. """
+    p, s = pos(box), size(box)
+    points = []
+    for i in range(s[0]):
+        for j in range(s[1]):
+            points.append(p + np.array([i, j, s[2]]))
+    points = [tuple(point) for point in points]
+    return set(points)
+
+def bottom_face(box):
+    """ Returns a set of points representing the bottom face of the box. Each tile is represented by its bottom-left corner. """
+    p, s = pos(box), size(box)
+    points = []
+    for i in range(s[0]):
+        for j in range(s[1]):
+            points.append(p + np.array([i, j, 0]))
+    points = [tuple(point) for point in points]
+    return set(points)

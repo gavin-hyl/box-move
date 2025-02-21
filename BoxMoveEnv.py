@@ -58,6 +58,7 @@ class BoxMoveEnv:
 
         if tries == max_tries:
             print(f"Could not generate a valid initial state with {n_boxes} boxes")
+            print(f"Generated {len(boxes)} boxes instead")
         
 
     # ==========================================================================
@@ -130,7 +131,10 @@ class BoxMoveEnv:
             
             for offset in np.ndindex(s):
                 coord = tuple(np.add(p, offset))
-                zone0_dense[coord] = box_idx + 1
+                if zone == 0:
+                    zone0_dense[coord] = box_idx + 1
+                else:
+                    zone1_dense[coord] = box_idx + 1
         
         return [zone0_dense, zone1_dense]
 

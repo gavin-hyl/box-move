@@ -2,8 +2,8 @@ import numpy as np
 GEO_DIM = 3
 BOX_DIM = 2*GEO_DIM + 1
 REMOVE_DIR = 2  # 0, 1, 2 for x, y, z
-ZONE0 = (5, 3, 3)
-ZONE1 = (5, 3, 3)
+ZONE0 = (5, 4, 3)
+ZONE1 = (3, 5, 4)
 ZONE_SIZES = [ZONE0, ZONE1]
 def zone0_dense_cpy():
     return np.zeros(ZONE0, dtype=int)

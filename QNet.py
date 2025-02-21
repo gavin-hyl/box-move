@@ -6,18 +6,11 @@ class CNNQNetwork(nn.Module):
     """
     A CNN that takes a 3D state and action representation and processes
     each zone (ZONE0 and ZONE1) with separate convolutional branches.
-    
-    The inputs are 5D tensors of shape:
-      [batch_size, channels, depth, height, width]
-    where channels=2 (channel 0: ZONE0, channel 1: ZONE1). Each channel is processed
-    independently, then the features are concatenated and passed through fully connected layers
-    to produce the Q value.
     """
     def __init__(self, state_channels=2, action_channels=2, base_channels=16):
         super(CNNQNetwork, self).__init__()
         
         # --- State branches ---
-        # Branch for ZONE0 from the state input.
         self.state_zone0_conv = nn.Sequential(
             nn.Conv3d(in_channels=1, out_channels=base_channels, kernel_size=3, stride=1, padding=1),
             nn.ReLU(),
@@ -25,7 +18,7 @@ class CNNQNetwork(nn.Module):
             nn.ReLU(),
             nn.AdaptiveAvgPool3d(1)
         )
-        # Branch for ZONE1 from the state input.
+
         self.state_zone1_conv = nn.Sequential(
             nn.Conv3d(in_channels=1, out_channels=base_channels, kernel_size=3, stride=1, padding=1),
             nn.ReLU(),
@@ -35,7 +28,6 @@ class CNNQNetwork(nn.Module):
         )
         
         # --- Action branches ---
-        # Branch for ZONE0 from the action input.
         self.action_zone0_conv = nn.Sequential(
             nn.Conv3d(in_channels=1, out_channels=base_channels, kernel_size=3, stride=1, padding=1),
             nn.ReLU(),
@@ -43,7 +35,7 @@ class CNNQNetwork(nn.Module):
             nn.ReLU(),
             nn.AdaptiveAvgPool3d(1)
         )
-        # Branch for ZONE1 from the action input.
+
         self.action_zone1_conv = nn.Sequential(
             nn.Conv3d(in_channels=1, out_channels=base_channels, kernel_size=3, stride=1, padding=1),
             nn.ReLU(),

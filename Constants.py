@@ -1,3 +1,7 @@
+#==========================================================
+#            Constants for Box Move Simulation
+#==========================================================
+
 import numpy as np
 GEO_DIM = 3
 BOX_DIM = 2*GEO_DIM + 1
@@ -14,6 +18,14 @@ def zone1_dense_cpy():
 ZONE0_DENSE = np.zeros(ZONE0, dtype=int)
 ZONE1_DENSE = np.zeros(ZONE1, dtype=int)
 DIRECTIONS = ['x', 'y', 'z']
+
+
+#==========================================================
+#                Constants for Training
+#==========================================================
+MODEL_NAME = "cnn_q_network.pth"
+MODEL_DIR = "models"
+DATA_DIR = "data"
 
 # print("===================================================")
 # print("Constants:")

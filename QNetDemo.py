@@ -5,7 +5,7 @@ import matplotlib.pyplot as plt
 
 from BoxMoveEnvGym import BoxMoveEnvGym
 from QNet import CNNQNetwork
-from Constants import ZONE0, ZONE1
+from Constants import MODEL_DIR, MODEL_NAME
 
 plt.ion()
 
@@ -20,7 +20,7 @@ def main():
     # Initialize the environment and load the pretrained CNN.
     env = BoxMoveEnvGym(horizon=50, n_boxes=10)
     net = CNNQNetwork(state_channels=2, action_channels=2)
-    net.load_state_dict(torch.load("cnn_q_network.pth"))
+    net.load_state_dict(torch.load(f"{MODEL_DIR}/{MODEL_NAME}"))
     net.eval()  # Set network to evaluation mode.
     
     done = False

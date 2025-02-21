@@ -6,7 +6,7 @@ from torch.utils.data import TensorDataset, DataLoader
 
 # Import our environment and constants.
 from BoxMoveEnvGym import BoxMoveEnvGym
-from Constants import ZONE0, ZONE1
+from Constants import ZONE0, ZONE1, MODEL_DIR, MODEL_NAME, DATA_DIR
 from QNet import CNNQNetwork
 
 def pad_to_shape(array, target_shape):
@@ -92,6 +92,10 @@ def generate_training_data(num_episodes=50, max_steps=20):
             steps += 1
         for d in episode_data:
             data.append((d[0], d[1], episode_reward))
+    # Save the data to a file in DATA_DIR.
+    data_path = f"{DATA_DIR}/training_data.npz"
+    np.savez_compressed(data_path, data=data)
+    print(f"Training data saved to {data_path}")
     return data
 
 def main():
@@ -130,9 +134,9 @@ def main():
         epoch_loss /= len(dataset)
         print(f"Epoch {epoch + 1}/{num_epochs}, Loss: {epoch_loss:.4f}")
 
-    # Save the trained model.
-    torch.save(net.state_dict(), "cnn_q_network.pth")
-    print("Training complete. Model saved as cnn_q_network.pth.")
+    model_path = f"{MODEL_DIR}/{MODEL_NAME}"
+    torch.save(net.state_dict(), f"{model_path}")
+    print(f"Training complete. Model saved as {model_path}")
 
 if __name__ == "__main__":
     main()

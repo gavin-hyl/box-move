@@ -1,4 +1,5 @@
 from BoxMoveEnv import BoxMoveEnv
+from BoxMoveEnvGym import BoxMoveEnvGym
 import Box
 
 def box_test():
@@ -19,11 +20,16 @@ def bme_test():
     print("Boxes:", Box.boxes_from_state(bme.state))
 
     bme.visualize_scene()
-    # for a in bme.actions():
-    #     print(a)
-    # if len(bme.actions()) == 0:
-    #     print("No actions found")
+    actions = bme.actions()
+    while actions:
+        bme.step(actions[0])
+        bme.visualize_scene()
+        actions = bme.actions()
+    print("no more actions")
+
+
 
 if __name__ == "__main__":
-    box_test()
+    # box_test()
     bme_test()
+    # gym_test()

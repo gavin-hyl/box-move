@@ -79,9 +79,7 @@ class BoxMoveEnv:
             for possible_end in self.zone1_top:
                 box_new = Box.make(possible_end, s, 1)
                 # the box is settled, and does not exceed the zone1 boundary
-                if (Box.bottom_face(box_new) <= self.zone1_top) and (p + s)[2] <= ZONE1[
-                    2
-                ]:
+                if (Box.bottom_face(box_new) <= self.zone1_top) and np.add(possible_end, s)[2] <= ZONE1[2]:
                     actions.append(BoxAction(p, possible_end))
         self.valid_actions = actions
         return self.valid_actions
@@ -177,15 +175,15 @@ class BoxMoveEnv:
             self.zone0_top = self.zone0_top.union(Box.top_face(box))
             self.zone0_top -= Box.bottom_face(box)
         else:
-            self.zone1_top += Box.top_face(box)
+            self.zone1_top = self.zone1_top.union(Box.top_face(box))
             self.zone1_top -= Box.bottom_face(box)
 
     def remove_box_from_zone(self, box):
         if Box.zone(box) == 0:
-            self.zone0_top += Box.bottom_face(box)
+            self.zone0_top = self.zone0_top.union(Box.bottom_face(box))
             self.zone0_top -= Box.top_face(box)
         else:
-            self.zone1_top += Box.bottom_face(box)
+            self.zone1_top = self.zone1_top.union(Box.bottom_face(box))
             self.zone1_top -= Box.top_face(box)
 
     def visualize_scene(self):
@@ -250,7 +248,9 @@ class BoxMoveEnv:
             ]
             
             # Choose color: blue for zone 0, red for zone 1.
-            color = 'blue' if zone == 0 else 'red'
+            # Generate a color based on the box index for better distinction
+            # np.random.seed(box_idx)  # Seed with box_idx for consistent coloring
+            color = np.array([0, 0, 1 - box_idx / len(boxes) * 0.5])
             poly3d = Poly3DCollection(faces, facecolors=color, edgecolors='k', alpha=0.7)
             
             # Add the cuboid to the corresponding subplot.

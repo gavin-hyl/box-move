@@ -57,9 +57,8 @@ class BoxMoveEnv:
                 self.add_box_to_zone(candidate_box)
 
         if tries == max_tries:
-            raise ValueError(
-                f"Could not generate a valid initial state with {n_boxes} boxes"
-            )
+            print(f"Could not generate a valid initial state with {n_boxes} boxes")
+        
 
     # ==========================================================================
     #                               MDP Functions

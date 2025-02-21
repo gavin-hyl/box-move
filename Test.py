@@ -13,7 +13,7 @@ def box_test():
 
 def bme_test():
     print("===BoxMoveEnv Test===")
-    bme = BoxMoveEnv(n_boxes=2)
+    bme = BoxMoveEnv(n_boxes=20)
     bme.reset()
     print("Zone 1 top:", bme.zone1_top)
     print("Boxes:", Box.boxes_from_state(bme.state))

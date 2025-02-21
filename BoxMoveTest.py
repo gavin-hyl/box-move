@@ -22,8 +22,8 @@ def bme_test():
 
     bme.visualize_scene()
     actions = bme.actions()
-    action_idx = random.randint(0, len(actions) - 1)
     while actions:
+        action_idx = random.randint(0, len(actions) - 1)
         bme.step(actions[action_idx])
         bme.visualize_scene()
         actions = bme.actions()
@@ -98,5 +98,5 @@ def gym_test():
 
 if __name__ == "__main__":
     # box_test()
-    # bme_test()
-    gym_test()
+    bme_test()
+    # gym_test()

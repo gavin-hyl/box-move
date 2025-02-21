@@ -195,77 +195,124 @@ class BoxMoveEnv:
     def visualize_scene(self):
         """
         Creates two 3D graphs (one for each zone) displaying all boxes in the environment.
+        In each subplot, it draws:
+        - The bounding box of the zone.
+        - Each box as a filled cuboid.
+        - The bounding box (wireframe) of each box in a color specific to the zone.
         """
-        # Create a figure with two 3D subplots
+        import matplotlib.pyplot as plt
+        from mpl_toolkits.mplot3d.art3d import Poly3DCollection
+        import numpy as np
+        from Constants import ZONE0, ZONE1
+
         fig = plt.figure(figsize=(16, 8))
         
-        # Zone 0 subplot
+        # Create subplots for zone 0 and zone 1.
         ax0 = fig.add_subplot(121, projection='3d')
         ax0.set_title("Zone 0")
-        # Set axis limits using ZONE0 dimensions.
         ax0.set_xlim(0, ZONE0[0])
         ax0.set_ylim(0, ZONE0[1])
         ax0.set_zlim(0, ZONE0[2])
         
-        # Zone 1 subplot
         ax1 = fig.add_subplot(122, projection='3d')
         ax1.set_title("Zone 1")
-        # Set axis limits using ZONE1 dimensions.
         ax1.set_xlim(0, ZONE1[0])
         ax1.set_ylim(0, ZONE1[1])
         ax1.set_zlim(0, ZONE1[2])
         
-        # Get all boxes from the current state
+        # Helper function: draw the bounding box (wireframe) for a zone.
+        def draw_zone_bounding_box(ax, zone_dims, color='black'):
+            dx, dy, dz = zone_dims
+            # Define the 8 vertices for the zone cuboid.
+            vertices = np.array([
+                [0, 0, 0],
+                [dx, 0, 0],
+                [dx, dy, 0],
+                [0, dy, 0],
+                [0, 0, dz],
+                [dx, 0, dz],
+                [dx, dy, dz],
+                [0, dy, dz],
+            ])
+            # Define all 12 edges by index pairs.
+            edges = [
+                (0, 1), (1, 2), (2, 3), (3, 0),  # bottom
+                (4, 5), (5, 6), (6, 7), (7, 4),  # top
+                (0, 4), (1, 5), (2, 6), (3, 7)   # vertical
+            ]
+            for i, j in edges:
+                ax.plot([vertices[i][0], vertices[j][0]],
+                        [vertices[i][1], vertices[j][1]],
+                        [vertices[i][2], vertices[j][2]],
+                        color=color, linewidth=2)
+
+        # Draw the zone boundaries.
+        draw_zone_bounding_box(ax0, ZONE0, color='black')
+        draw_zone_bounding_box(ax1, ZONE1, color='black')
+        
+        # Get all boxes from the current state.
         boxes = Box.boxes_from_state(self.state)
         
-        # Iterate through each box and draw it in its corresponding zone subplot.
         for box in boxes:
-            pos = Box.pos(box)      # (x, y, z) position of the box
-            size = Box.size(box)    # (dx, dy, dz) dimensions of the box
-            zone = Box.zone(box)    # Zone number: 0 or 1
-            
-            # For a unique identifier (optional) - may be used for coloring, etc.
+            pos = Box.pos(box)      # (x, y, z)
+            size = Box.size(box)    # (dx, dy, dz)
+            zone = Box.zone(box)    # 0 or 1
+            # You can use the box index for a bit of color variation.
             box_idx = Box.box_idx(self.state, pos, zone)
-            
-            # Unpack position and size for clarity.
             x, y, z = pos
             dx, dy, dz = size
             
-            # Compute the eight vertices of the cuboid.
+            # Compute the 8 vertices for the box.
             vertices = np.array([
-                [x,      y,      z],
-                [x + dx, y,      z],
+                [x, y, z],
+                [x + dx, y, z],
                 [x + dx, y + dy, z],
-                [x,      y + dy, z],
-                [x,      y,      z + dz],
-                [x + dx, y,      z + dz],
+                [x, y + dy, z],
+                [x, y, z + dz],
+                [x + dx, y, z + dz],
                 [x + dx, y + dy, z + dz],
-                [x,      y + dy, z + dz],
+                [x, y + dy, z + dz]
             ])
             
-            # Define the six faces of the cuboid.
+            # Define the 6 faces for the box.
             faces = [
                 [vertices[0], vertices[1], vertices[2], vertices[3]],  # bottom
                 [vertices[4], vertices[5], vertices[6], vertices[7]],  # top
                 [vertices[0], vertices[1], vertices[5], vertices[4]],  # front
                 [vertices[2], vertices[3], vertices[7], vertices[6]],  # back
                 [vertices[1], vertices[2], vertices[6], vertices[5]],  # right
-                [vertices[3], vertices[0], vertices[4], vertices[7]],  # left
+                [vertices[3], vertices[0], vertices[4], vertices[7]]   # left
             ]
             
-            # Choose color: blue for zone 0, red for zone 1.
-            # Generate a color based on the box index for better distinction
-            # np.random.seed(box_idx)  # Seed with box_idx for consistent coloring
-            color = np.array([0, 0, 1 - box_idx / len(boxes) * 0.5])
-            poly3d = Poly3DCollection(faces, facecolors=color, edgecolors='k', alpha=0.7)
-            
-            # Add the cuboid to the corresponding subplot.
+            # Choose subplot and wireframe color based on zone.
             if zone == 0:
-                ax0.add_collection3d(poly3d)
+                # For zone 0, use a blue-based color.
+                face_color = np.array([0, 0, 1 - box_idx / (len(boxes) + 1) * 0.5])
+                wire_color = 'magenta'
+                ax = ax0
             else:
-                ax1.add_collection3d(poly3d)
+                # For zone 1, use a red-based color.
+                face_color = np.array([1 - box_idx / (len(boxes) + 1) * 0.5, 0, 0])
+                wire_color = 'red'
+                ax = ax1
+            
+            # Draw filled faces for the box (semi-transparent).
+            poly3d = Poly3DCollection(faces, facecolors=face_color, edgecolors='none', alpha=0.7)
+            ax.add_collection3d(poly3d)
+            
+            # Now draw the bounding box (wireframe) for the box.
+            # edges = [
+            #     (0, 1), (1, 2), (2, 3), (3, 0),  # bottom face
+            #     (4, 5), (5, 6), (6, 7), (7, 4),  # top face
+            #     (0, 4), (1, 5), (2, 6), (3, 7)   # vertical edges
+            # ]
+            # for i, j in edges:
+            #     ax.plot([vertices[i][0], vertices[j][0]],
+            #             [vertices[i][1], vertices[j][1]],
+            #             [vertices[i][2], vertices[j][2]],
+            #             color=wire_color, linewidth=2)
         
-        # Set axis labels and a consistent view angle for both subplots.
+        # Set axis labels and a consistent view angle.
         for ax in [ax0, ax1]:
             ax.set_xlabel('X')
             ax.set_ylabel('Y')

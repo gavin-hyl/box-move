@@ -102,6 +102,32 @@ class CNNQNetwork(nn.Module):
         
         q_value = self.fc(combined_features)
         return q_value
+    
+    def forward_separate(self, state_zone0, state_zone1, action_zone0, action_zone1):
+        """
+        Forward pass that accepts state and action representations as separate tensors.
+        Each input is assumed to be of shape [batch, 1, D, H, W], where D, H, W may differ
+        between zone0 and zone1.
+        """
+        # Process state zones separately.
+        s0 = self.state_zone0_conv(state_zone0)  # [batch, base_channels*2, 1,1,1]
+        s1 = self.state_zone1_conv(state_zone1)
+        s0 = s0.view(s0.size(0), -1)
+        s1 = s1.view(s1.size(0), -1)
+        state_features = torch.cat([s0, s1], dim=1)
+        
+        # Process action zones separately.
+        a0 = self.action_zone0_conv(action_zone0)
+        a1 = self.action_zone1_conv(action_zone1)
+        a0 = a0.view(a0.size(0), -1)
+        a1 = a1.view(a1.size(0), -1)
+        action_features = torch.cat([a0, a1], dim=1)
+        
+        # Combine features and compute Q value.
+        combined_features = torch.cat([state_features, action_features], dim=1)
+        q_value = self.fc(combined_features)
+        return q_value
+
 
 if __name__ == "__main__":
     # Quick test using dummy inputs.

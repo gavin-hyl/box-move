@@ -44,6 +44,9 @@ def generate_training_data(num_episodes=50, max_steps=20):
         env.reset()
         done = False
         steps = 0
+
+        episode_data = []
+        episode_reward = 0
         
         while not done and steps < max_steps:
             # Get the current 3D state representation.
@@ -83,8 +86,12 @@ def generate_training_data(num_episodes=50, max_steps=20):
             next_state, reward, done, truncated, info = env.step(action_idx)
             
             # Append the training sample.
-            data.append((state_np.copy(), action_np.copy(), reward))
+            episode_data.append((state_np.copy(), action_np.copy()))
+            episode_reward = reward
+            # data.append((state_np.copy(), action_np.copy(), reward))
             steps += 1
+        for d in episode_data:
+            data.append((d[0], d[1], episode_reward))
     return data
 
 def main():

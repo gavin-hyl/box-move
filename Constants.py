@@ -5,6 +5,12 @@ REMOVE_DIR = 2  # 0, 1, 2 for x, y, z
 ZONE0 = (3, 2, 2)
 ZONE1 = (2, 3, 2)
 ZONE_SIZES = [ZONE0, ZONE1]
+def zone0_dense_cpy():
+    return np.zeros(ZONE0, dtype=int)
+
+def zone1_dense_cpy():
+    return np.zeros(ZONE1, dtype=int)
+
 ZONE0_DENSE = np.zeros(ZONE0, dtype=int)
 ZONE1_DENSE = np.zeros(ZONE1, dtype=int)
 DIRECTIONS = ['x', 'y', 'z']

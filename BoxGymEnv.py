@@ -1,6 +1,6 @@
 import Box
 from Dense import dense_state, dense_action
-from Constants import GEO_DIM, BOX_DIM, REMOVE_DIR, ZONE_SIZES, ZONE0, ZONE1
+from Constants import BOX_DIM, ZONE0, ZONE1
 import Core
 
 import numpy as np

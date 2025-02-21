@@ -147,14 +147,16 @@ class BoxMoveEnv:
     def action_3d(self, action):
         p_from = action.pos_from
         p_to = action.pos_to
-        box_idx = Box.box_idx(self.state, p_from, action.zone_from)
+        # Use zone 0 for the source box (since boxes are moved from zone 0 to zone 1)
+        box_idx = Box.box_idx(self.state, p_from, 0)
         box = Box.access_from_state(self.state, box_idx)
-        s = Box.size(box)
+        s = tuple(Box.size(box))  # Ensure s is a tuple of ints
         zone0_dense = zone0_dense_cpy()
         zone1_dense = zone1_dense_cpy()
-        for point in np.ndindex(s):
-            zone0_dense[p_from + point] = -1 * (box_idx + 1)
-            zone1_dense[p_to + point] = box_idx + 1
+        for offset in np.ndindex(s):
+            # Compute new coordinates by elementwise addition and convert to tuple for indexing.
+            zone0_dense[tuple(np.add(p_from, offset))] = box_idx + 1
+            zone1_dense[tuple(np.add(p_to, offset))] = box_idx + 1
         return [zone0_dense, zone1_dense]
 
     # ==========================================================================

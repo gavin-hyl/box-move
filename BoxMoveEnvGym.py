@@ -12,7 +12,7 @@ class BoxMoveEnvGym(gym.Env):
     
     The action space is defined as a Discrete space, where each integer corresponds to a
     specific (pos_from, pos_to) move from zone0 to zone1. The observation is taken from
-    BoxMoveEnv.state_1d(), which you may adjust as needed.
+    BoxMoveEnv.state_1d()
     """
     metadata = {"render.modes": ["human"]}
 
@@ -67,6 +67,7 @@ class BoxMoveEnvGym(gym.Env):
             obs (np.ndarray): The next state observation.
             reward (float): The reward after taking the action.
             done (bool): True if the episode has ended.
+            truncated (bool): True if the episode was truncated (not used here).
             info (dict): Additional information (e.g., if the chosen action was invalid).
         """
         # Map the discrete action index to a BoxAction.
@@ -76,7 +77,7 @@ class BoxMoveEnvGym(gym.Env):
 
         # Check if the chosen action is among the valid actions.
         valid = any(
-            (va.pos_from == chosen_action.pos_from and va.pos_to == chosen_action.pos_to)
+            chosen_action == va
             for va in self.env.actions()
         )
         if not valid:
@@ -85,7 +86,7 @@ class BoxMoveEnvGym(gym.Env):
             obs = self.env.state_1d()
             done = False
             info = {"invalid_action": True}
-            return obs, penalty, done, info
+            return obs, penalty, done, True, info
 
         # Perform the action in the underlying environment.
         reward = self.env.step(chosen_action)
@@ -93,13 +94,16 @@ class BoxMoveEnvGym(gym.Env):
         # Determine if the episode is done (i.e., reached the horizon or no valid actions remain).
         done = (self.env.state[-1] == self.env.horizon or len(self.env.actions()) == 0)
         info = {}
-        return obs, reward, done, info
+        return obs, reward, done, False, info
 
     def render(self, mode="human"):
         """
         Render the current state of the environment.
         """
-        self.env.visualize_scene()
+        if mode == "human":
+            self.env.visualize_scene()
+        else:
+            raise NotImplementedError(f"Render mode {mode} is not supported.")
 
     def close(self):
         """

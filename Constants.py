@@ -23,7 +23,7 @@ DIRECTIONS = ['x', 'y', 'z']
 #==========================================================
 #                Constants for Training
 #==========================================================
-MODEL_NAME = "cnn_q_network.pth"
+MODEL_NAME = "cnn_q_network_stage_reward.pth"
 MODEL_DIR = "models"
 DATA_DIR = "data"
 

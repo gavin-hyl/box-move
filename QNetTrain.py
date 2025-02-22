@@ -9,55 +9,32 @@ from BoxMoveEnvGym import BoxMoveEnvGym
 from Constants import ZONE0, ZONE1, MODEL_DIR, MODEL_NAME, DATA_DIR
 from QNet import CNNQNetwork
 
-def pad_to_shape(array, target_shape):
-    """
-    Pads the input 3D array with zeros at the end of each axis so that its shape matches target_shape.
-    """
-    pad_width = [(0, t - s) for s, t in zip(array.shape, target_shape)]
-    return np.pad(array, pad_width, mode='constant', constant_values=0)
-
 def generate_training_data(num_episodes=50, max_steps=20):
     """
     Generate training samples by running the BoxMove environment.
     
     For each step, we extract a 3D state and action representation.
-    The state is composed of two channels (ZONE0 and ZONE1) from state_3d(),
-    and the action is composed of two channels (ZONE0 and ZONE1) from action_3d().
-    
-    Since ZONE0 and ZONE1 have different spatial dimensions, we pad both to a common shape.
-    The common shape is computed as the elementwise maximum of ZONE0 and ZONE1.
+    The state is represented as two arrays (one for each zone) obtained from state_3d(),
+    and the action is represented as two arrays from the chosen action.
     
     Returns:
-        data: List of tuples (state_np, action_np, reward)
-              where state_np has shape [2, D, H, W] and action_np has shape [2, D, H, W]
+        data: List of tuples (state_zone0, state_zone1, action_zone0, action_zone1, reward)
     """
     data = []
     env = BoxMoveEnvGym(horizon=50, n_boxes=15)
     
-    # Determine common shape: elementwise maximum between ZONE0 and ZONE1.
-    target_shape = (max(ZONE0[0], ZONE1[0]),
-                    max(ZONE0[1], ZONE1[1]),
-                    max(ZONE0[2], ZONE1[2]))
-    
     for ep in range(num_episodes):
-        # Reset the environment.
         env.reset()
         done = False
         steps = 0
-
         episode_data = []
         episode_reward = 0
         
         while not done and steps < max_steps:
-            # Get the current 3D state representation.
-            # state_3d() returns a list: [zone0_dense, zone1_dense]
+            # Get current 3D state (list: [zone0_dense, zone1_dense])
             state_3d = env.env.state_3d()  # using the underlying environment
-            # Pad each zone to the common target shape.
-            padded_state = [pad_to_shape(zone, target_shape) for zone in state_3d]
-            # Stack both zones along a new channel dimension.
-            state_np = np.stack(padded_state, axis=0)
             
-            # Retrieve the list of valid actions.
+            # Retrieve valid actions.
             valid_actions = env.env.actions()
             if len(valid_actions) == 0:
                 break
@@ -66,11 +43,7 @@ def generate_training_data(num_episodes=50, max_steps=20):
             chosen_action = np.random.choice(valid_actions)
             
             # Get the 3D representation for the action.
-            # action_3d() returns a list: [zone0_dense, zone1_dense]
             action_3d = env.env.action_3d(chosen_action)
-            padded_action = [pad_to_shape(zone, target_shape) for zone in action_3d]
-            # Stack both zones along a new channel dimension.
-            action_np = np.stack(padded_action, axis=0)
             
             # Find the discrete action index corresponding to chosen_action.
             action_idx = None
@@ -80,62 +53,64 @@ def generate_training_data(num_episodes=50, max_steps=20):
                     break
             if action_idx is None:
                 steps += 1
-                continue  # Skip if we can't determine the discrete index.
+                continue
             
-            # Take the step in the environment.
+            # Take the step.
             next_state, reward, done, truncated, info = env.step(action_idx)
             
-            # Append the training sample.
-            episode_data.append((state_np.copy(), action_np.copy()))
-            episode_reward = reward
-            # data.append((state_np.copy(), action_np.copy(), reward))
+            # Append the training sample:
+            # (state_zone0, state_zone1, action_zone0, action_zone1, reward)
+            episode_data.append((state_3d[0].copy(), state_3d[1].copy(),
+                                 action_3d[0].copy(), action_3d[1].copy(), reward))
+            # episode_reward = reward
             steps += 1
+        
         for d in episode_data:
-            data.append((d[0], d[1], episode_reward))
-    # Save the data to a file in DATA_DIR.
-    data_path = f"{DATA_DIR}/training_data.npz"
-    np.savez_compressed(data_path, data=data)
-    print(f"Training data saved to {data_path}")
+            data.append((d[0], d[1], d[2], d[3], d[4]))
+    
+    # Save training data.
     return data
 
 def main():
-    # Generate training data.
     print("Generating training data...")
     data = generate_training_data(num_episodes=100, max_steps=20)
     print(f"Collected {len(data)} samples.")
-
-    # Convert the list of samples into torch tensors.
-    # The network expects inputs of shape [batch_size, channels, depth, height, width].
-    states = torch.tensor(np.array([sample[0] for sample in data]), dtype=torch.float32)
-    actions = torch.tensor(np.array([sample[1] for sample in data]), dtype=torch.float32)
-    rewards = torch.tensor(np.array([sample[2] for sample in data]), dtype=torch.float32).unsqueeze(1)
-
-    # Create a dataset and a DataLoader.
-    dataset = TensorDataset(states, actions, rewards)
+    
+    # Convert samples into torch tensors.
+    # For each zone, add a channel dimension to get shape [batch_size, 1, D, H, W].
+    states_zone0 = torch.tensor(np.array([sample[0] for sample in data]), dtype=torch.float32).unsqueeze(1)
+    states_zone1 = torch.tensor(np.array([sample[1] for sample in data]), dtype=torch.float32).unsqueeze(1)
+    actions_zone0 = torch.tensor(np.array([sample[2] for sample in data]), dtype=torch.float32).unsqueeze(1)
+    actions_zone1 = torch.tensor(np.array([sample[3] for sample in data]), dtype=torch.float32).unsqueeze(1)
+    rewards = torch.tensor(np.array([sample[4] for sample in data]), dtype=torch.float32).unsqueeze(1)
+    
+    # Create a dataset with separate inputs for each zone.
+    dataset = TensorDataset(states_zone0, states_zone1, actions_zone0, actions_zone1, rewards)
     loader = DataLoader(dataset, batch_size=32, shuffle=True)
-
-    # Instantiate the CNN Q network.
-    # Note: The network now expects state inputs with spatial dimensions equal to target_shape.
-    net = CNNQNetwork(state_channels=2, action_channels=2)
+    
+    # Instantiate the CNN Q-network.
+    net = CNNQNetwork()
     optimizer = optim.Adam(net.parameters(), lr=0.001)
     loss_fn = nn.MSELoss()
-
+    
     num_epochs = 30
     print("Starting training...")
     for epoch in range(num_epochs):
         epoch_loss = 0.0
-        for state_batch, action_batch, reward_batch in loader:
+        for state_z0_batch, state_z1_batch, action_z0_batch, action_z1_batch, reward_batch in loader:
             optimizer.zero_grad()
-            q_pred = net(state_batch, action_batch)
+            # Use the network's forward_separate method.
+            q_pred = net.forward_separate(state_z0_batch, state_z1_batch,
+                                          action_z0_batch, action_z1_batch)
             loss = loss_fn(q_pred, reward_batch)
             loss.backward()
             optimizer.step()
-            epoch_loss += loss.item() * state_batch.size(0)
+            epoch_loss += loss.item() * state_z0_batch.size(0)
         epoch_loss /= len(dataset)
         print(f"Epoch {epoch + 1}/{num_epochs}, Loss: {epoch_loss:.4f}")
-
+    
     model_path = f"{MODEL_DIR}/{MODEL_NAME}"
-    torch.save(net.state_dict(), f"{model_path}")
+    torch.save(net.state_dict(), model_path)
     print(f"Training complete. Model saved as {model_path}")
 
 if __name__ == "__main__":

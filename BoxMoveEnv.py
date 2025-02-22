@@ -59,7 +59,6 @@ class BoxMoveEnv:
         if tries == max_tries:
             print(f"Could not generate a valid initial state with {n_boxes} boxes")
             print(f"Generated {len(boxes)} boxes instead")
-        
 
     # ==========================================================================
     #                               MDP Functions
@@ -80,7 +79,9 @@ class BoxMoveEnv:
             for possible_end in self.zone1_top:
                 box_new = Box.make(possible_end, s, 1)
                 # the box is settled, and does not exceed the zone1 boundary
-                if (Box.bottom_face(box_new) <= self.zone1_top) and np.add(possible_end, s)[2] <= ZONE1[2]:
+                if (Box.bottom_face(box_new) <= self.zone1_top) and np.add(
+                    possible_end, s
+                )[2] <= ZONE1[2]:
                     actions.append(BoxAction(p, possible_end))
         self.valid_actions = actions
         return self.valid_actions
@@ -103,8 +104,8 @@ class BoxMoveEnv:
     def reward(self):
         return (
             self.occupancy()
-            if self.state[-1] == self.horizon or len(self.actions()) == 0
-            else 0
+            # if self.state[-1] == self.horizon or len(self.actions()) == 0
+            # else 0    # FIXME uncomment to use sparse rewards
         )
 
     # ==========================================================================
@@ -120,22 +121,22 @@ class BoxMoveEnv:
     def state_3d(self):
         zone0_dense = zone0_dense_cpy()
         zone1_dense = zone1_dense_cpy()
-        
+
         boxes = Box.boxes_from_state(self.state)
-        
+
         for box in boxes:
             p = Box.pos(box)
             s = tuple(Box.size(box))
             zone = Box.zone(box)
             box_idx = Box.box_idx(self.state, p, zone)
-            
+
             for offset in np.ndindex(s):
                 coord = tuple(np.add(p, offset))
                 if zone == 0:
                     zone0_dense[coord] = box_idx + 1
                 else:
                     zone1_dense[coord] = box_idx + 1
-        
+
         return [zone0_dense, zone1_dense]
 
     def action_1d(self, action):
@@ -206,74 +207,90 @@ class BoxMoveEnv:
         from Constants import ZONE0, ZONE1
 
         fig = plt.figure(figsize=(16, 8))
-        
+
         # Create subplots for zone 0 and zone 1.
-        ax0 = fig.add_subplot(121, projection='3d')
+        ax0 = fig.add_subplot(121, projection="3d")
         ax0.set_title("Zone 0")
         ax0.set_xlim(0, ZONE0[0])
         ax0.set_ylim(0, ZONE0[1])
         ax0.set_zlim(0, ZONE0[2])
-        
-        ax1 = fig.add_subplot(122, projection='3d')
+
+        ax1 = fig.add_subplot(122, projection="3d")
         ax1.set_title("Zone 1")
         ax1.set_xlim(0, ZONE1[0])
         ax1.set_ylim(0, ZONE1[1])
         ax1.set_zlim(0, ZONE1[2])
-        
+
         # Helper function: draw the bounding box (wireframe) for a zone.
-        def draw_zone_bounding_box(ax, zone_dims, color='black'):
+        def draw_zone_bounding_box(ax, zone_dims, color="black"):
             dx, dy, dz = zone_dims
             # Define the 8 vertices for the zone cuboid.
-            vertices = np.array([
-                [0, 0, 0],
-                [dx, 0, 0],
-                [dx, dy, 0],
-                [0, dy, 0],
-                [0, 0, dz],
-                [dx, 0, dz],
-                [dx, dy, dz],
-                [0, dy, dz],
-            ])
+            vertices = np.array(
+                [
+                    [0, 0, 0],
+                    [dx, 0, 0],
+                    [dx, dy, 0],
+                    [0, dy, 0],
+                    [0, 0, dz],
+                    [dx, 0, dz],
+                    [dx, dy, dz],
+                    [0, dy, dz],
+                ]
+            )
             # Define all 12 edges by index pairs.
             edges = [
-                (0, 1), (1, 2), (2, 3), (3, 0),  # bottom
-                (4, 5), (5, 6), (6, 7), (7, 4),  # top
-                (0, 4), (1, 5), (2, 6), (3, 7)   # vertical
+                (0, 1),
+                (1, 2),
+                (2, 3),
+                (3, 0),  # bottom
+                (4, 5),
+                (5, 6),
+                (6, 7),
+                (7, 4),  # top
+                (0, 4),
+                (1, 5),
+                (2, 6),
+                (3, 7),  # vertical
             ]
             for i, j in edges:
-                ax.plot([vertices[i][0], vertices[j][0]],
-                        [vertices[i][1], vertices[j][1]],
-                        [vertices[i][2], vertices[j][2]],
-                        color=color, linewidth=2)
+                ax.plot(
+                    [vertices[i][0], vertices[j][0]],
+                    [vertices[i][1], vertices[j][1]],
+                    [vertices[i][2], vertices[j][2]],
+                    color=color,
+                    linewidth=2,
+                )
 
         # Draw the zone boundaries.
-        draw_zone_bounding_box(ax0, ZONE0, color='black')
-        draw_zone_bounding_box(ax1, ZONE1, color='black')
-        
+        draw_zone_bounding_box(ax0, ZONE0, color="black")
+        draw_zone_bounding_box(ax1, ZONE1, color="black")
+
         # Get all boxes from the current state.
         boxes = Box.boxes_from_state(self.state)
-        
+
         for box in boxes:
-            pos = Box.pos(box)      # (x, y, z)
-            size = Box.size(box)    # (dx, dy, dz)
-            zone = Box.zone(box)    # 0 or 1
+            pos = Box.pos(box)  # (x, y, z)
+            size = Box.size(box)  # (dx, dy, dz)
+            zone = Box.zone(box)  # 0 or 1
             # You can use the box index for a bit of color variation.
             box_idx = Box.box_idx(self.state, pos, zone)
             x, y, z = pos
             dx, dy, dz = size
-            
+
             # Compute the 8 vertices for the box.
-            vertices = np.array([
-                [x, y, z],
-                [x + dx, y, z],
-                [x + dx, y + dy, z],
-                [x, y + dy, z],
-                [x, y, z + dz],
-                [x + dx, y, z + dz],
-                [x + dx, y + dy, z + dz],
-                [x, y + dy, z + dz]
-            ])
-            
+            vertices = np.array(
+                [
+                    [x, y, z],
+                    [x + dx, y, z],
+                    [x + dx, y + dy, z],
+                    [x, y + dy, z],
+                    [x, y, z + dz],
+                    [x + dx, y, z + dz],
+                    [x + dx, y + dy, z + dz],
+                    [x, y + dy, z + dz],
+                ]
+            )
+
             # Define the 6 faces for the box.
             faces = [
                 [vertices[0], vertices[1], vertices[2], vertices[3]],  # bottom
@@ -281,25 +298,27 @@ class BoxMoveEnv:
                 [vertices[0], vertices[1], vertices[5], vertices[4]],  # front
                 [vertices[2], vertices[3], vertices[7], vertices[6]],  # back
                 [vertices[1], vertices[2], vertices[6], vertices[5]],  # right
-                [vertices[3], vertices[0], vertices[4], vertices[7]]   # left
+                [vertices[3], vertices[0], vertices[4], vertices[7]],  # left
             ]
-            
+
             # Choose subplot and wireframe color based on zone.
             if zone == 0:
                 # For zone 0, use a blue-based color.
                 face_color = np.array([0, 0, 1 - box_idx / (len(boxes) + 1) * 0.5])
-                wire_color = 'magenta'
+                wire_color = "magenta"
                 ax = ax0
             else:
                 # For zone 1, use a red-based color.
                 face_color = np.array([1 - box_idx / (len(boxes) + 1) * 0.5, 0, 0])
-                wire_color = 'red'
+                wire_color = "red"
                 ax = ax1
-            
+
             # Draw filled faces for the box (semi-transparent).
-            poly3d = Poly3DCollection(faces, facecolors=face_color, edgecolors='none', alpha=0.7)
+            poly3d = Poly3DCollection(
+                faces, facecolors=face_color, edgecolors="none", alpha=0.7
+            )
             ax.add_collection3d(poly3d)
-            
+
             # Now draw the bounding box (wireframe) for the box.
             # edges = [
             #     (0, 1), (1, 2), (2, 3), (3, 0),  # bottom face
@@ -311,13 +330,13 @@ class BoxMoveEnv:
             #             [vertices[i][1], vertices[j][1]],
             #             [vertices[i][2], vertices[j][2]],
             #             color=wire_color, linewidth=2)
-        
+
         # Set axis labels and a consistent view angle.
         for ax in [ax0, ax1]:
-            ax.set_xlabel('X')
-            ax.set_ylabel('Y')
-            ax.set_zlabel('Z')
+            ax.set_xlabel("X")
+            ax.set_ylabel("Y")
+            ax.set_zlabel("Z")
             ax.view_init(elev=20, azim=30)
-        
+
         plt.tight_layout()
         plt.show()

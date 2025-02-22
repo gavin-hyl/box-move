@@ -19,7 +19,7 @@ def get_discrete_action_index(env, chosen_action):
 def main():
     # Initialize the environment and load the pretrained CNN.
     env = BoxMoveEnvGym(horizon=50, n_boxes=10)
-    net = CNNQNetwork(state_channels=2, action_channels=2)
+    net = CNNQNetwork()
     net.load_state_dict(torch.load(f"{MODEL_DIR}/{MODEL_NAME}"))
     net.eval()  # Set network to evaluation mode.
     

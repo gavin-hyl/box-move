@@ -7,7 +7,7 @@ class CNNQNetwork(nn.Module):
     A CNN that takes a 3D state and action representation and processes
     each zone (ZONE0 and ZONE1) with separate convolutional branches.
     """
-    def __init__(self, state_channels=2, action_channels=2, base_channels=16):
+    def __init__(self, base_channels=16):
         super(CNNQNetwork, self).__init__()
         
         # --- State branches ---
@@ -57,44 +57,6 @@ class CNNQNetwork(nn.Module):
             nn.Linear(64, 1)
         )
     
-    def forward(self, state, action):
-        """
-        Forward pass of the network.
-        
-        Args:
-            state: Tensor of shape [batch_size, 2, D, H, W] where
-                   state[:,0] is the ZONE0 channel and state[:,1] is the ZONE1 channel.
-            action: Tensor of shape [batch_size, 2, D, H, W] with a similar channel structure.
-        
-        Returns:
-            q_value: Tensor of shape [batch_size, 1]
-        """
-        # Split state channels.
-        state_zone0 = state[:, 0:1, :, :, :]  # Shape: [batch, 1, D, H, W]
-        state_zone1 = state[:, 1:2, :, :, :]  # Shape: [batch, 1, D, H, W]
-        # Process state channels.
-        state_zone0_features = self.state_zone0_conv(state_zone0)
-        state_zone1_features = self.state_zone1_conv(state_zone1)
-        state_zone0_features = state_zone0_features.view(state_zone0_features.size(0), -1)
-        state_zone1_features = state_zone1_features.view(state_zone1_features.size(0), -1)
-        state_features = torch.cat([state_zone0_features, state_zone1_features], dim=1)  # [batch, base_channels*4]
-        
-        # Split action channels.
-        action_zone0 = action[:, 0:1, :, :, :]
-        action_zone1 = action[:, 1:2, :, :, :]
-        # Process action channels.
-        action_zone0_features = self.action_zone0_conv(action_zone0)
-        action_zone1_features = self.action_zone1_conv(action_zone1)
-        action_zone0_features = action_zone0_features.view(action_zone0_features.size(0), -1)
-        action_zone1_features = action_zone1_features.view(action_zone1_features.size(0), -1)
-        action_features = torch.cat([action_zone0_features, action_zone1_features], dim=1)  # [batch, base_channels*4]
-        
-        # Combine state and action features.
-        combined_features = torch.cat([state_features, action_features], dim=1)  # [batch, base_channels*8]
-        
-        q_value = self.fc(combined_features)
-        return q_value
-    
     def forward_separate(self, state_zone0, state_zone1, action_zone0, action_zone1):
         """
         Forward pass that accepts state and action representations as separate tensors.
@@ -120,6 +82,25 @@ class CNNQNetwork(nn.Module):
         q_value = self.fc(combined_features)
         return q_value
 
+    def select_action(self, state_zone0, state_zone1, valid_actions):
+        """
+        Selects the action with the highest Q-value from the list of valid actions.
+        """
+        best_q = -float('inf')
+        best_action = None
+
+        for action in valid_actions:
+            action_zone0 = torch.tensor(action[0], dtype=torch.float32).unsqueeze(0).unsqueeze(0)
+            action_zone1 = torch.tensor(action[1], dtype=torch.float32).unsqueeze(0).unsqueeze(0)
+
+            with torch.no_grad():
+                q_value = self.forward_separate(state_zone0, state_zone1, action_zone0, action_zone1)
+
+            if q_value.item() > best_q:
+                best_q = q_value.item()
+                best_action = action
+
+        return best_action, best_q
 
 if __name__ == "__main__":
     # Quick test using dummy inputs.

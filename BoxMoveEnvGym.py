@@ -71,7 +71,7 @@ class BoxMoveEnvGym(gym.Env):
             info (dict): Additional information (e.g., if the chosen action was invalid).
         """
         # Map the discrete action index to a BoxAction.
-        if action not in self._action_map:
+        if action not in self._action_map.keys():
             raise ValueError("Action index out of range.")
         chosen_action = self._action_map[action]
 

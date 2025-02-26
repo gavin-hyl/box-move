@@ -6,7 +6,7 @@ from torch.utils.data import TensorDataset, DataLoader
 
 # Import our environment and constants.
 from BoxMoveEnvGym import BoxMoveEnvGym
-from Constants import ZONE0, ZONE1, MODEL_DIR, MODEL_NAME, DATA_DIR
+from Constants import ZONE0, ZONE1, MODEL_DIR, DATA_DIR
 from QNet import CNNQNetwork
 
 def generate_training_data(num_episodes=50, max_steps=20):
@@ -26,11 +26,12 @@ def generate_training_data(num_episodes=50, max_steps=20):
     for ep in range(num_episodes):
         env.reset()
         done = False
+        truncated = False
         steps = 0
         episode_data = []
         episode_reward = 0
         
-        while not done and steps < max_steps:
+        while not done and not truncated and steps < max_steps:
             # Get current 3D state (list: [zone0_dense, zone1_dense])
             state_3d = env.env.state_3d()  # using the underlying environment
             
@@ -61,12 +62,12 @@ def generate_training_data(num_episodes=50, max_steps=20):
             # Append the training sample:
             # (state_zone0, state_zone1, action_zone0, action_zone1, reward)
             episode_data.append((state_3d[0].copy(), state_3d[1].copy(),
-                                 action_3d[0].copy(), action_3d[1].copy(), reward))
-            # episode_reward = reward
+                                 action_3d[0].copy(), action_3d[1].copy()))
+            episode_reward = reward
             steps += 1
         
         for d in episode_data:
-            data.append((d[0], d[1], d[2], d[3], d[4]))
+            data.append((d[0], d[1], d[2], d[3], episode_reward))
     
     # Save training data.
     return data
@@ -99,8 +100,8 @@ def main():
         epoch_loss = 0.0
         for state_z0_batch, state_z1_batch, action_z0_batch, action_z1_batch, reward_batch in loader:
             optimizer.zero_grad()
-            # Use the network's forward_separate method.
-            q_pred = net.forward_separate(state_z0_batch, state_z1_batch,
+            # Use the network's forward method.
+            q_pred = net.forward(state_z0_batch, state_z1_batch,
                                           action_z0_batch, action_z1_batch)
             loss = loss_fn(q_pred, reward_batch)
             loss.backward()
@@ -109,6 +110,7 @@ def main():
         epoch_loss /= len(dataset)
         print(f"Epoch {epoch + 1}/{num_epochs}, Loss: {epoch_loss:.4f}")
     
+    MODEL_NAME = "cnn_qnet.pth"
     model_path = f"{MODEL_DIR}/{MODEL_NAME}"
     torch.save(net.state_dict(), model_path)
     print(f"Training complete. Model saved as {model_path}")

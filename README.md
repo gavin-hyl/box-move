@@ -22,7 +22,7 @@ The main components of this project include:
   The **BoxMove** environment simulates moving boxes from **ZONE0** to **ZONE1**. The zones have different sizes (defined in [Constants.py](Constants.py)), and the environment provides 3D state representations and actions that move boxes between zones.
 
 - **Q-Network:**  
-  A convolutional neural network (CNN) implemented in [QNet.py](QNet.py) evaluates state–action pairs to compute Q-values. It includes separate convolutional branches for each zone, enabling it to accommodate the different dimensions of the zones. An extended method (`forward_separate`) has been added to process the zones without any padding.
+  A convolutional neural network (CNN) implemented in [QNet.py](QNet.py) evaluates state–action pairs to compute Q-values. It includes separate convolutional branches for each zone, enabling it to accommodate the different dimensions of the zones.
 
 - **Training Pipeline:**  
   The training script ([QNetTrain.py](QNetTrain.py)) generates training data by running the environment and then trains the CNN Q-network using PyTorch.
@@ -45,7 +45,7 @@ The main components of this project include:
 ## Repository Structure
 
 - **QNet.py**  
-  Defines the CNN Q-network with separate convolutional branches for the two zones. Also includes a `forward_separate` method for processing raw zone representations.
+  Defines the CNN Q-network with separate convolutional branches for the two zones. Also includes a `forward` method for processing raw zone representations.
 
 - **QNetTrain.py**  
   Generates training data from the BoxMove environment and trains the Q-network.

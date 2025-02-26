@@ -50,7 +50,7 @@ def main():
             action_zone1 = torch.tensor(action_3d[1], dtype=torch.float32).unsqueeze(0).unsqueeze(0)
             
             with torch.no_grad():
-                q_value = net.forward_separate(state_zone0, state_zone1, action_zone0, action_zone1)
+                q_value = net.forward(state_zone0, state_zone1, action_zone0, action_zone1)
             
             if q_value.item() > best_q:
                 best_q = q_value.item()

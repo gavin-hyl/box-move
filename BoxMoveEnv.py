@@ -79,9 +79,8 @@ class BoxMoveEnv:
             for possible_end in self.zone1_top:
                 box_new = Box.make(possible_end, s, 1)
                 # the box is settled, and does not exceed the zone1 boundary
-                if (Box.bottom_face(box_new) <= self.zone1_top) and np.add(
-                    possible_end, s
-                )[2] <= ZONE1[2]:
+                if (Box.bottom_face(box_new) <= self.zone1_top) \
+                    and np.add(possible_end, s)[2] <= ZONE1[2]:
                     actions.append(BoxAction(p, possible_end))
         self.valid_actions = actions
         return self.valid_actions
@@ -104,8 +103,8 @@ class BoxMoveEnv:
     def reward(self):
         return (
             self.occupancy()
-            # if self.state[-1] == self.horizon or len(self.actions()) == 0
-            # else 0    # FIXME uncomment to use sparse rewards
+            if self.state[-1] == self.horizon or len(self.actions()) == 0
+            else 0    # FIXME uncomment to use sparse rewards
         )
 
     # ==========================================================================
@@ -201,11 +200,7 @@ class BoxMoveEnv:
         - Each box as a filled cuboid.
         - The bounding box (wireframe) of each box in a color specific to the zone.
         """
-        import matplotlib.pyplot as plt
-        from mpl_toolkits.mplot3d.art3d import Poly3DCollection
-        import numpy as np
-        from Constants import ZONE0, ZONE1
-
+        
         fig = plt.figure(figsize=(16, 8))
 
         # Create subplots for zone 0 and zone 1.

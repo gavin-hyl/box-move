@@ -5,7 +5,7 @@ import matplotlib.pyplot as plt
 
 from BoxMoveEnvGym import BoxMoveEnvGym
 from QNet import CNNQNetwork
-from Constants import MODEL_DIR, MODEL_NAME
+from Constants import MODEL_DIR
 
 def get_discrete_action_index(env, chosen_action):
     """Helper function to get the discrete action index for a given BoxAction."""
@@ -53,7 +53,7 @@ def run_episode(env, policy, net=None, render=False):
                 action_zone0 = torch.tensor(action_3d[0], dtype=torch.float32).unsqueeze(0).unsqueeze(0)
                 action_zone1 = torch.tensor(action_3d[1], dtype=torch.float32).unsqueeze(0).unsqueeze(0)
                 with torch.no_grad():
-                    q_value = net.forward_separate(state_zone0, state_zone1, action_zone0, action_zone1)
+                    q_value = net.forward(state_zone0, state_zone1, action_zone0, action_zone1)
                 if q_value.item() > best_q:
                     best_q = q_value.item()
                     best_action = action
@@ -119,7 +119,7 @@ def main():
     # Benchmark CNN-based policy.
     print("Benchmarking CNN-based policy...")
     net = CNNQNetwork()
-    model_path = f"{MODEL_DIR}/{MODEL_NAME}"
+    model_path = f"{MODEL_DIR}/cnn_qnet.pth"
     net.load_state_dict(torch.load(model_path))
     net.eval()
     cnn_avg_reward, cnn_avg_steps = benchmark("cnn", num_episodes=num_episodes, net=net)

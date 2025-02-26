@@ -57,7 +57,7 @@ class CNNQNetwork(nn.Module):
             nn.Linear(64, 1)
         )
     
-    def forward_separate(self, state_zone0, state_zone1, action_zone0, action_zone1):
+    def forward(self, state_zone0, state_zone1, action_zone0, action_zone1):
         """
         Forward pass that accepts state and action representations as separate tensors.
         Each input is assumed to be of shape [batch, 1, D, H, W], where D, H, W may differ
@@ -87,20 +87,20 @@ class CNNQNetwork(nn.Module):
         Selects the action with the highest Q-value from the list of valid actions.
         """
         best_q = -float('inf')
-        best_action = None
+        best_action_idx = None
 
-        for action in valid_actions:
+        for i, action in enumerate(valid_actions):
             action_zone0 = torch.tensor(action[0], dtype=torch.float32).unsqueeze(0).unsqueeze(0)
             action_zone1 = torch.tensor(action[1], dtype=torch.float32).unsqueeze(0).unsqueeze(0)
 
             with torch.no_grad():
-                q_value = self.forward_separate(state_zone0, state_zone1, action_zone0, action_zone1)
+                q_value = self.forward(state_zone0, state_zone1, action_zone0, action_zone1)
 
             if q_value.item() > best_q:
                 best_q = q_value.item()
-                best_action = action
+                best_action_idx = i
 
-        return best_action, best_q
+        return best_action_idx, best_q
 
 if __name__ == "__main__":
     # Quick test using dummy inputs.

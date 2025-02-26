@@ -1,7 +1,6 @@
 import time
 import numpy as np
 import torch
-import matplotlib.pyplot as plt
 
 from BoxMoveEnvGym import BoxMoveEnvGym
 from QNet import CNNQNetwork

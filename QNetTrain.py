@@ -6,7 +6,7 @@ from torch.utils.data import TensorDataset, DataLoader
 
 # Import our environment and constants.
 from BoxMoveEnvGym import BoxMoveEnvGym
-from Constants import ZONE0, ZONE1, MODEL_DIR, DATA_DIR
+from Constants import MODEL_DIR
 from QNet import CNNQNetwork
 
 def generate_training_data(num_episodes=50, max_steps=20):

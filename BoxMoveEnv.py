@@ -1,14 +1,14 @@
-import numpy as np
+import copy
 import random
 
-from BoxAction import BoxAction
-from Constants import ZONE0, ZONE1, zone0_dense_cpy, zone1_dense_cpy
-import Box
-import copy
-
+import numpy as np
 import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d.art3d import Poly3DCollection
-import numpy as np
+
+import Box
+from BoxAction import BoxAction
+from Constants import ZONE0, ZONE1, zone0_dense_cpy, zone1_dense_cpy
+
 
 
 class BoxMoveEnv:
@@ -300,12 +300,10 @@ class BoxMoveEnv:
             if zone == 0:
                 # For zone 0, use a blue-based color.
                 face_color = np.array([0, 0, 1 - box_idx / (len(boxes) + 1) * 0.5])
-                wire_color = "magenta"
                 ax = ax0
             else:
                 # For zone 1, use a red-based color.
                 face_color = np.array([1 - box_idx / (len(boxes) + 1) * 0.5, 0, 0])
-                wire_color = "red"
                 ax = ax1
 
             # Draw filled faces for the box (semi-transparent).

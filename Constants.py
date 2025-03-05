@@ -3,8 +3,12 @@
 #==========================================================
 
 import numpy as np
-GEO_DIM = 3
-BOX_DIM = 2*GEO_DIM + 1
+
+GEOM_DIM = 3
+ZONE_IDX = 2*GEOM_DIM
+VAL_IDX = ZONE_IDX + 1
+BOX_DIM = VAL_IDX + 1
+
 REMOVE_DIR = 2  # 0, 1, 2 for x, y, z
 ZONE0 = (5, 4, 3)
 ZONE1 = (3, 5, 4)

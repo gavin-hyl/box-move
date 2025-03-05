@@ -1,5 +1,42 @@
 import numpy as np
-from Constants import GEO_DIM, BOX_DIM, REMOVE_DIR
+from Constants import GEOM_DIM, BOX_DIM, VAL_IDX, ZONE_IDX
+
+
+class Box:
+    def __init__(self, pos=None, size=None, zone=None, val=None):
+        self.pos = pos if pos is not None else np.zeros(GEOM_DIM)
+        self.size = size if size is not None else np.zeros(GEOM_DIM)
+        self.zone = zone if zone is not None else -1
+        self.val = val if val is not None else 0
+    
+    def __eq__(self, other):
+        return self.pos == other.pos and self.size == other.size and self.zone == other.zone and self.val == other.val
+    
+    def __str__(self):
+        return f"pos={self.pos}, size={self.size}, zone={self.zone}, val={self.val}"
+    
+    def __repr__(self):
+        return str(self)
+
+    def top_face(self):
+        """ Returns a set of points representing the top face of the box. Each tile is represented by its bottom-left corner. """
+        points = []
+        for i in range(self.size[0]):
+            for j in range(self.size[1]):
+                points.append(self.pos + np.array([i, j, self.size[2]]))
+        points = [tuple(point) for point in points]
+        return set(points)
+
+    def bottom_face(self):
+        """ Returns a set of points representing the bottom face of the box. Each tile is represented by its bottom-left corner. """
+        points = []
+        for i in range(self.size[0]):
+            for j in range(self.size[1]):
+                points.append(self.pos + np.array([i, j, 0]))
+        points = [tuple(point) for point in points]
+        return set(points)
+    
+
 
 
 def pos(box, p=None):
@@ -7,29 +44,36 @@ def pos(box, p=None):
         print(f"Box: {box}")
         raise ValueError(f"Box must be of length {BOX_DIM}, not {len(box)}")
     if p is not None:
-        box[:GEO_DIM] = p
-    return box[:GEO_DIM]
+        box[:GEOM_DIM] = p
+    return box[:GEOM_DIM]
 
 
 def size(box, size=None):
     if size is not None:
-        box[GEO_DIM : 2 * GEO_DIM] = size
-    return box[GEO_DIM : 2 * GEO_DIM]
+        box[GEOM_DIM : 2 * GEOM_DIM] = size
+    return box[GEOM_DIM : 2 * GEOM_DIM]
 
 
 def zone(box, zone=None):
     if zone is not None:
-        box[2 * GEO_DIM] = zone
-    return box[2 * GEO_DIM]
+        box[ZONE_IDX] = zone
+    return box[ZONE_IDX]
 
 
-def make(p, s, zone):
+def val(box, val=None):
+    if val is not None:
+        box[VAL_IDX] = val
+    return box[VAL_IDX]
+
+
+def make(p, s, zone, val):
     rep = np.zeros(BOX_DIM, dtype=int)
     for i, x in enumerate(p):
         rep[i] = x
     for i, x in enumerate(s):
-        rep[i + GEO_DIM] = x
-    rep[2 * GEO_DIM] = zone
+        rep[i + GEOM_DIM] = x
+    rep[ZONE_IDX] = zone
+    rep[VAL_IDX] = val
     return rep
 
 
@@ -72,51 +116,14 @@ def box_idx(state, p, z):
 def to_str(state):
     boxes = boxes_from_state(state)
     return (
-        str([f"p={pos(box)}, s={size(box)}, z={zone(box)}" for box in boxes])
+        str([f"p={pos(box)}, s={size(box)}, z={zone(box)}, v={val(box)}" for box in boxes])
         + f", t={state[-1]}"
     )
 
 
-def key_from_pair(box1, box2):
-    """Returns a hashable key for a pair of boxes."""
-    box1_first = False
-    for i in range(BOX_DIM):
-        box1_first = box1[i] < box2[i]
-        if box1[i] != box2[i]:
-            break
-    it = iter([box1, box2]) if box1_first else iter([box2, box1])
-    key = []
-    for box in it:
-        key.extend(list(box))
-    return tuple(key)
-
-
-def in_front(box1, box2):
-    """Returns True if box1 is in front of box2, False otherwise."""
-    return pos(box1)[REMOVE_DIR] > pos(box2)[REMOVE_DIR]
-
-
 def null_box():
     """Creates a box that is not valid for placeholding."""
-    return make(np.zeros(GEO_DIM), np.zeros(GEO_DIM), -1)
-
-
-def is_null(box):
-    """Checks if the box is null."""
-    return (box == null_box()).all()
-
-
-def top_and_bottom(box):
-    """Computes the top and bottom points of the box."""
-    bottom_points = set()
-    top_points = set()
-    p = pos(box)
-    s = size(box)
-    for i in range(s[0] + 1):
-        for j in range(s[1] + 1):
-            bottom_points.add(tuple(p + np.array([i, j, 0])))
-            top_points.add(tuple(p + np.array([i, j, s[2]])))
-    return top_points, bottom_points
+    return make(np.zeros(GEOM_DIM), np.zeros(GEOM_DIM), -1)
 
 
 def top_face(box):

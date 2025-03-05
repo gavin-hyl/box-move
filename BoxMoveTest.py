@@ -5,20 +5,22 @@ import Box
 
 def box_test():
     print("===Box Test===")
-    b = Box.make([0, 0, 0], [1, 2, 3], 0)
+    # Create a Box using the new constructor signature:
+    b = Box.Box([0, 0, 0], [1, 2, 3], 0, 1)
     print(b)
-    print("pos:", Box.pos(b))
-    print("size:", Box.size(b))
-    print("zone:", Box.zone(b))
-    print("bottom_face:", Box.bottom_face(b))
-    print("top_face:", Box.top_face(b))
+    print("pos:", b.pos)
+    print("size:", b.size)
+    print("zone:", b.zone)
+    print("bottom_face:", b.bottom_face())
+    print("top_face:", b.top_face())
 
 def bme_test():
     print("===BoxMoveEnv Test===")
     bme = BoxMoveEnv(n_boxes=20)
     bme.reset()
     print("Zone 1 top:", bme.zone1_top)
-    print("Boxes:", Box.boxes_from_state(bme.state))
+    # Now that the environment stores boxes as a list, print that list directly.
+    print("Boxes:", bme.boxes)
 
     bme.visualize_scene()
     actions = bme.actions()
@@ -27,14 +29,13 @@ def bme_test():
         bme.step(actions[action_idx])
         bme.visualize_scene()
         actions = bme.actions()
-    print("no more actions")
-
+    print("No more actions.")
 
 def gym_test():
     # Create the environment with a short horizon and a few boxes for testing.
     env = BoxMoveEnvGym(horizon=10, gamma=1, n_boxes=3)
     
-    # Reset the environment
+    # Reset the environment.
     obs = env.reset(n_boxes=3)
     print("Initial observation:\n", obs)
     
@@ -69,10 +70,7 @@ def gym_test():
     # Now, try to find a discrete action index that is not valid.
     invalid_action_index = None
     for idx, discrete_action in env._action_map.items():
-        is_valid = any(
-            discrete_action == va
-            for va in valid_box_actions
-        )
+        is_valid = any(discrete_action == va for va in valid_box_actions)
         if not is_valid:
             invalid_action_index = idx
             break
@@ -95,8 +93,8 @@ def gym_test():
     except Exception as e:
         print("Render failed with exception:", e)
 
-
 if __name__ == "__main__":
-    # box_test()
+    # Uncomment the test(s) you want to run.
+    box_test()
     bme_test()
-    # gym_test()
+    gym_test()

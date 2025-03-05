@@ -42,6 +42,7 @@ def main():
         # Loop over valid actions and compute Q-values.
         best_q = -float('inf')
         best_action = None
+        q_values = []   # Store Q-values for visualization.
         for action in valid_actions:
             # Get the 3D action representation (returns [zone0_dense, zone1_dense])
             action_3d = env.env.action_3d(action)
@@ -51,9 +52,14 @@ def main():
             with torch.no_grad():
                 q_value = net.forward(state_zone0, state_zone1, action_zone0, action_zone1)
             
+            q_values.append(q_value.item())
             if q_value.item() > best_q:
                 best_q = q_value.item()
                 best_action = action
+
+        import numpy as np
+        print(f"Step {step}: Q value variance = {np.var(q_values):.4f}, Q value mean = {np.mean(q_values):.4f}, Q value max = {np.max(q_values):.4f}")
+        print(f"Q values: {q_values}")
         
         print(f"Step {step}: Best Q value = {best_q:.4f} for action {best_action}")
         

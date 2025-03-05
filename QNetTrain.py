@@ -2,79 +2,20 @@ import numpy as np
 import torch
 import torch.nn as nn
 import torch.optim as optim
-from torch.utils.data import TensorDataset, DataLoader
+from torch.utils.data import TensorDataset, DataLoader, random_split
 
 # Import our environment and constants.
-from BoxMoveEnvGym import BoxMoveEnvGym
 from Constants import MODEL_DIR
 from QNet import CNNQNetwork
+from Utils import LossTracker
+from DataHandling import load_data
 
-def generate_training_data(num_episodes=50, max_steps=20):
-    """
-    Generate training samples by running the BoxMove environment.
-    
-    For each step, we extract a 3D state and action representation.
-    The state is represented as two arrays (one for each zone) obtained from state_3d(),
-    and the action is represented as two arrays from the chosen action.
-    
-    Returns:
-        data: List of tuples (state_zone0, state_zone1, action_zone0, action_zone1, reward)
-    """
-    data = []
-    env = BoxMoveEnvGym(horizon=50, n_boxes=15)
-    
-    for ep in range(num_episodes):
-        env.reset()
-        done = False
-        truncated = False
-        steps = 0
-        episode_data = []
-        episode_reward = 0
-        
-        while not done and not truncated and steps < max_steps:
-            # Get current 3D state (list: [zone0_dense, zone1_dense])
-            state_3d = env.env.state_3d()  # using the underlying environment
-            
-            # Retrieve valid actions.
-            valid_actions = env.env.actions()
-            if len(valid_actions) == 0:
-                break
-            
-            # Randomly choose one valid action.
-            chosen_action = np.random.choice(valid_actions)
-            
-            # Get the 3D representation for the action.
-            action_3d = env.env.action_3d(chosen_action)
-            
-            # Find the discrete action index corresponding to chosen_action.
-            action_idx = None
-            for idx, act in env._action_map.items():
-                if act == chosen_action:
-                    action_idx = idx
-                    break
-            if action_idx is None:
-                steps += 1
-                continue
-            
-            # Take the step.
-            next_state, reward, done, truncated, info = env.step(action_idx)
-            
-            # Append the training sample:
-            # (state_zone0, state_zone1, action_zone0, action_zone1, reward)
-            episode_data.append((state_3d[0].copy(), state_3d[1].copy(),
-                                 action_3d[0].copy(), action_3d[1].copy()))
-            episode_reward = reward
-            steps += 1
-        
-        for d in episode_data:
-            data.append((d[0], d[1], d[2], d[3], episode_reward))
-    
-    # Save training data.
-    return data
 
 def main():
+    MODEL_NAME = "cnn_qnet"
+
     print("Generating training data...")
-    data = generate_training_data(num_episodes=100, max_steps=20)
+    data = load_data("training_data100")
     print(f"Collected {len(data)} samples.")
     
     # Convert samples into torch tensors.
@@ -87,7 +28,14 @@ def main():
     
     # Create a dataset with separate inputs for each zone.
     dataset = TensorDataset(states_zone0, states_zone1, actions_zone0, actions_zone1, rewards)
-    loader = DataLoader(dataset, batch_size=32, shuffle=True)
+    
+    # Split the dataset into training and validation sets (80% training, 20% validation).
+    train_size = int(0.8 * len(dataset))
+    val_size = len(dataset) - train_size
+    train_dataset, val_dataset = random_split(dataset, [train_size, val_size])
+    
+    train_loader = DataLoader(train_dataset, batch_size=32, shuffle=True)
+    val_loader = DataLoader(val_dataset, batch_size=32, shuffle=False)
     
     # Instantiate the CNN Q-network.
     net = CNNQNetwork()
@@ -96,24 +44,46 @@ def main():
     
     num_epochs = 30
     print("Starting training...")
+    tracker = LossTracker(patience=10)
+    
     for epoch in range(num_epochs):
-        epoch_loss = 0.0
-        for state_z0_batch, state_z1_batch, action_z0_batch, action_z1_batch, reward_batch in loader:
+        # Training phase
+        net.train()
+        epoch_train_loss = 0.0
+        for state_z0_batch, state_z1_batch, action_z0_batch, action_z1_batch, reward_batch in train_loader:
             optimizer.zero_grad()
-            # Use the network's forward method.
-            q_pred = net.forward(state_z0_batch, state_z1_batch,
-                                          action_z0_batch, action_z1_batch)
+            q_pred = net.forward(state_z0_batch, state_z1_batch, action_z0_batch, action_z1_batch)
             loss = loss_fn(q_pred, reward_batch)
             loss.backward()
             optimizer.step()
-            epoch_loss += loss.item() * state_z0_batch.size(0)
-        epoch_loss /= len(dataset)
-        print(f"Epoch {epoch + 1}/{num_epochs}, Loss: {epoch_loss:.4f}")
-    
-    MODEL_NAME = "cnn_qnet.pth"
-    model_path = f"{MODEL_DIR}/{MODEL_NAME}"
-    torch.save(net.state_dict(), model_path)
+            epoch_train_loss += loss.item() * state_z0_batch.size(0)
+        epoch_train_loss /= train_size
+        
+        # Validation phase
+        net.eval()
+        epoch_val_loss = 0.0
+        with torch.no_grad():
+            for state_z0_batch, state_z1_batch, action_z0_batch, action_z1_batch, reward_batch in val_loader:
+                q_pred = net.forward(state_z0_batch, state_z1_batch, action_z0_batch, action_z1_batch)
+                loss = loss_fn(q_pred, reward_batch)
+                epoch_val_loss += loss.item() * state_z0_batch.size(0)
+        epoch_val_loss /= val_size
+        
+        print(f"Epoch {epoch + 1}/{num_epochs}, Train Loss: {epoch_train_loss:.4f}, Val Loss: {epoch_val_loss:.4f}")
+        
+        # Early stopping check
+        tracker(epoch_train_loss, epoch_val_loss)
+        if tracker.early_stop:
+            print("Early stopping triggered.")
+            break
+        
+        if epoch % 5 == 0:
+            model_path = f"{MODEL_DIR}/{MODEL_NAME}_epoch{epoch}.pth"
+            torch.save(net.state_dict(), model_path)
+
     print(f"Training complete. Model saved as {model_path}")
+    tracker.render()
+
 
 if __name__ == "__main__":
     main()

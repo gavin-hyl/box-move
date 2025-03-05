@@ -4,6 +4,7 @@ import torch.nn as nn
 import torch.optim as optim
 from torch.utils.data import TensorDataset, DataLoader, random_split
 from tqdm import tqdm
+import os
 
 # Import our environment and constants.
 from Constants import MODEL_DIR
@@ -11,13 +12,26 @@ from QNet import CNNQNetwork
 from Utils import LossTracker
 from DataHandling import load_data
 
+import argparse
+
+
+
 
 def main():
-    MODEL_NAME = "cnn_qnet"
+    # Set up command line arguments
+    parser = argparse.ArgumentParser(description='Train the Q-Network')
+    parser.add_argument('--model-name', default='cnn_qnet', type=str,
+                       help='Name of the model')
+    parser.add_argument('--folder-name', default='vanilla', type=str,
+                        help='Name of the folder to save the model')
+    args = parser.parse_args()
+
+    MODEL_NAME = args.model_name
+    FOLDER_NAME = args.folder_name
 
     print("Generating training data...")
-    data = load_data("training_data300")
-    print(f"Collected {len(data)} samples.")
+    data = load_data("small_zone_1", "training_data300")
+    print(f"Loaded {len(data)} samples.")
     
     # Convert samples into torch tensors.
     # For each zone, add a channel dimension to get shape [batch_size, 1, D, H, W].
@@ -41,7 +55,7 @@ def main():
     # Instantiate the CNN Q-network.
     net = CNNQNetwork()
     optimizer = optim.Adam(net.parameters(), lr=0.001)
-    loss_fn = nn.MSELoss()
+    loss_fn = nn.SmoothL1Loss()
     
     num_epochs = 50
     print("Starting training...")
@@ -79,10 +93,12 @@ def main():
             break
         
         if epoch % 5 == 0:
-            model_path = f"{MODEL_DIR}/{MODEL_NAME}_epoch{epoch}.pth"
+            model_path = f"{MODEL_DIR}/{FOLDER_NAME}/{MODEL_NAME}_epoch{epoch}.pth"
+            if not os.path.exists(f"{MODEL_DIR}/{FOLDER_NAME}"):
+                os.makedirs(f"{MODEL_DIR}/{FOLDER_NAME}")
             torch.save(net.state_dict(), model_path)
 
-    model_path = f"{MODEL_DIR}/{MODEL_NAME}_epoch{epoch}.pth"
+    model_path = f"{MODEL_DIR}/{FOLDER_NAME}/{MODEL_NAME}_epoch{epoch}.pth"
     tqdm.write(f"Training complete. Model saved as {model_path}")
     tracker.render()
 

@@ -1,7 +1,6 @@
 import time
 import numpy as np
 import torch
-import matplotlib.pyplot as plt
 
 from BoxMoveEnvGym import BoxMoveEnvGym
 from QNet import CNNQNetwork
@@ -114,55 +113,25 @@ def benchmark(policy, num_episodes=50, net=None):
         steps_list.append(steps)
         print(f"Episode {ep+1}/{num_episodes}: Reward = {total_reward:.4f}, Steps = {steps}")
     avg_reward = np.mean(rewards)
-    avg_steps = np.mean(steps_list)
-    return avg_reward, avg_steps, rewards
+    print(f"Mean = {avg_reward:.4f}, Var = {np.var(rewards):.4f}")
 
-def draw_combined_histogram(rewards_dict, title="Reward Histogram", bins=10):
-    """
-    Draws a combined histogram for rewards from multiple policies.
-    
-    Args:
-        rewards_dict (dict): Dictionary mapping policy names to lists of rewards.
-        title (str): Title of the histogram.
-        bins (int): Number of bins in the histogram.
-    """
-    plt.figure(figsize=(10, 7))
-    for policy_name, rewards in rewards_dict.items():
-        plt.hist(rewards, bins=bins, alpha=0.5, label=policy_name, edgecolor='black')
-    plt.title(title)
-    plt.xlabel("Reward")
-    plt.ylabel("Frequency")
-    plt.legend()
-    plt.show()
 
 def main():
     num_episodes = 20
-    rewards_dict = {}
 
-    # Benchmark Random policy.
     print("\nBenchmarking Random policy...")
-    random_avg_reward, random_avg_steps, random_rewards = benchmark("random", num_episodes=num_episodes)
-    print(f"Random Policy: Avg Reward = {random_avg_reward:.4f}, Avg Steps = {random_avg_steps:.2f}")
-    rewards_dict["Random"] = random_rewards
+    benchmark("random", num_episodes=num_episodes)
 
-    # Benchmark CNN-based policy.
     print("\nBenchmarking CNN-based policy...")
     net = CNNQNetwork()
-    model_path = f"{MODEL_DIR}/cnn_qnet_epoch45.pth"
+    model_path = f"{MODEL_DIR}/cnn_qnet_v1_small_zone_1_epoch25.pth"
     net.load_state_dict(torch.load(model_path))
     net.eval()
-    cnn_avg_reward, cnn_avg_steps, cnn_rewards = benchmark("cnn", num_episodes=num_episodes, net=net)
-    print(f"CNN Policy: Avg Reward = {cnn_avg_reward:.4f}, Avg Steps = {cnn_avg_steps:.2f}")
-    rewards_dict["CNN"] = cnn_rewards
+    benchmark("cnn", num_episodes=num_episodes, net=net)
 
-    # Benchmark Greedy policy.
     print("\nBenchmarking Greedy policy...")
-    greedy_avg_reward, greedy_avg_steps, greedy_rewards = benchmark("greedy", num_episodes=num_episodes)
-    print(f"Greedy Policy: Avg Reward = {greedy_avg_reward:.4f}, Avg Steps = {greedy_avg_steps:.2f}")
-    rewards_dict["Greedy"] = greedy_rewards
+    benchmark("greedy", num_episodes=num_episodes)
 
-    # Draw a combined histogram of rewards.
-    draw_combined_histogram(rewards_dict, title="Combined Policy Reward Histogram", bins=10)
     
 if __name__ == "__main__":
     main()

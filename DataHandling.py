@@ -1,5 +1,6 @@
 import numpy as np
 from tqdm import tqdm
+import os
 
 from BoxMoveEnvGym import BoxMoveEnvGym
 from Constants import DATA_DIR
@@ -69,7 +70,7 @@ def generate_training_data(num_episodes=50, max_steps=20):
     return data
 
 
-def save_data(data, filename):
+def save_data(data, foldername, filename):
     """
     Save the training data to a file.
     
@@ -83,15 +84,19 @@ def save_data(data, filename):
     action0 = [d[2] for d in data]
     action1 = [d[3] for d in data]
     rewards = [d[4] for d in data]
-    np.save(f"{DATA_DIR}/{filename}_states0.npy", state0)
-    np.save(f"{DATA_DIR}/{filename}_states1.npy", state1)
-    np.save(f"{DATA_DIR}/{filename}_actions0.npy", action0)
-    np.save(f"{DATA_DIR}/{filename}_actions1.npy", action1)
-    np.save(f"{DATA_DIR}/{filename}_rewards.npy", rewards)
-    print(f"Data saved to '{filename}'.")
+    prefix = f"{DATA_DIR}/{foldername}"
+    if not os.path.exists(prefix):
+        os.makedirs(prefix)
+    
+    np.save(f"{prefix}/{filename}_states0.npy", state0)
+    np.save(f"{prefix}/{filename}_states1.npy", state1)
+    np.save(f"{prefix}/{filename}_actions0.npy", action0)
+    np.save(f"{prefix}/{filename}_actions1.npy", action1)
+    np.save(f"{prefix}/{filename}_rewards.npy", rewards)
+    print(f"Data saved to '{prefix}/{filename}'.")
 
 
-def load_data(filename):
+def load_data(foldername, filename):
     """
     Load the training data from a file.
     
@@ -101,11 +106,12 @@ def load_data(filename):
     Returns:
         data: List of tuples (state_zone0, state_zone1, action_zone0, action_zone1, reward)
     """
-    state0 = np.load(f"{DATA_DIR}/{filename}_states0.npy", allow_pickle=True)
-    state1 = np.load(f"{DATA_DIR}/{filename}_states1.npy", allow_pickle=True)
-    action0 = np.load(f"{DATA_DIR}/{filename}_actions0.npy", allow_pickle=True)
-    action1 = np.load(f"{DATA_DIR}/{filename}_actions1.npy", allow_pickle=True)
-    rewards = np.load(f"{DATA_DIR}/{filename}_rewards.npy", allow_pickle=True)
+    prefix = f"{DATA_DIR}/{foldername}"
+    state0 = np.load(f"{prefix}/{filename}_states0.npy", allow_pickle=True)
+    state1 = np.load(f"{prefix}/{filename}_states1.npy", allow_pickle=True)
+    action0 = np.load(f"{prefix}/{filename}_actions0.npy", allow_pickle=True)
+    action1 = np.load(f"{prefix}/{filename}_actions1.npy", allow_pickle=True)
+    rewards = np.load(f"{prefix}/{filename}_rewards.npy", allow_pickle=True)
     
     data = [(state0[i], state1[i], action0[i], action1[i], rewards[i]) for i in range(len(state0))]
     return data
@@ -114,4 +120,4 @@ def load_data(filename):
 if __name__ == "__main__":
     N_EP = 300
     training_data = generate_training_data(num_episodes=N_EP, max_steps=20)
-    save_data(training_data, f"training_data{N_EP}")
+    save_data(training_data, "small_zone_1", f"training_data{N_EP}")

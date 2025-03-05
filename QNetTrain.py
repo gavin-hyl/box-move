@@ -3,6 +3,7 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 from torch.utils.data import TensorDataset, DataLoader, random_split
+from tqdm import tqdm
 
 # Import our environment and constants.
 from Constants import MODEL_DIR
@@ -15,7 +16,7 @@ def main():
     MODEL_NAME = "cnn_qnet"
 
     print("Generating training data...")
-    data = load_data("training_data100")
+    data = load_data("training_data300")
     print(f"Collected {len(data)} samples.")
     
     # Convert samples into torch tensors.
@@ -46,13 +47,13 @@ def main():
     print("Starting training...")
     tracker = LossTracker(patience=10)
     
-    for epoch in range(num_epochs):
+    for epoch in tqdm(range(num_epochs), desc="Epochs", unit="epoch"):
         # Training phase
         net.train()
         epoch_train_loss = 0.0
-        for state_z0_batch, state_z1_batch, action_z0_batch, action_z1_batch, reward_batch in train_loader:
+        for state_z0_batch, state_z1_batch, action_z0_batch, action_z1_batch, reward_batch in tqdm(train_loader, desc="Train batches", leave=False):
             optimizer.zero_grad()
-            q_pred = net.forward(state_z0_batch, state_z1_batch, action_z0_batch, action_z1_batch)
+            q_pred = net(state_z0_batch, state_z1_batch, action_z0_batch, action_z1_batch)
             loss = loss_fn(q_pred, reward_batch)
             loss.backward()
             optimizer.step()
@@ -63,25 +64,26 @@ def main():
         net.eval()
         epoch_val_loss = 0.0
         with torch.no_grad():
-            for state_z0_batch, state_z1_batch, action_z0_batch, action_z1_batch, reward_batch in val_loader:
-                q_pred = net.forward(state_z0_batch, state_z1_batch, action_z0_batch, action_z1_batch)
+            for state_z0_batch, state_z1_batch, action_z0_batch, action_z1_batch, reward_batch in tqdm(val_loader, desc="Val batches", leave=False):
+                q_pred = net(state_z0_batch, state_z1_batch, action_z0_batch, action_z1_batch)
                 loss = loss_fn(q_pred, reward_batch)
                 epoch_val_loss += loss.item() * state_z0_batch.size(0)
         epoch_val_loss /= val_size
         
-        print(f"Epoch {epoch + 1}/{num_epochs}, Train Loss: {epoch_train_loss:.4f}, Val Loss: {epoch_val_loss:.4f}")
+        tqdm.write(f"Epoch {epoch + 1}/{num_epochs}, Train Loss: {epoch_train_loss:.4f}, Val Loss: {epoch_val_loss:.4f}")
         
         # Early stopping check
         tracker(epoch_train_loss, epoch_val_loss)
         if tracker.early_stop:
-            print("Early stopping triggered.")
+            tqdm.write("Early stopping triggered.")
             break
         
         if epoch % 5 == 0:
             model_path = f"{MODEL_DIR}/{MODEL_NAME}_epoch{epoch}.pth"
             torch.save(net.state_dict(), model_path)
 
-    print(f"Training complete. Model saved as {model_path}")
+    model_path = f"{MODEL_DIR}/{MODEL_NAME}_epoch{epoch}.pth"
+    tqdm.write(f"Training complete. Model saved as {model_path}")
     tracker.render()
 
 

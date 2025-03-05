@@ -96,5 +96,5 @@ def gym_test():
 if __name__ == "__main__":
     # Uncomment the test(s) you want to run.
     box_test()
-    # bme_test()
-    gym_test()
+    bme_test()
+    # gym_test()

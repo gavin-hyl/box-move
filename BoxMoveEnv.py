@@ -3,6 +3,8 @@ import random
 import numpy as np
 import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d.art3d import Poly3DCollection
+import matplotlib.cm as cm
+import matplotlib.colors as mcolors
 
 from Box import Box
 from BoxAction import BoxAction
@@ -121,8 +123,6 @@ class BoxMoveEnv:
     def reward(self):
         # Use dense reward (proportional occupancy) when terminal or no actions available.
         if self.t == self.horizon or len(self.actions()) == 0:
-            # total = sum(np.prod(box.size) for box in self.boxes if box.zone == 1)
-            # return total / np.prod(ZONE1)
             z0, z1 = self.state_3d()
             return np.sum(z1)
         else:
@@ -208,9 +208,10 @@ class BoxMoveEnv:
     def visualize_scene(self):
         """
         Displays 3D views of both zones with:
-          - The zone's bounding box.
-          - Each box drawn as a filled cuboid.
-          - (Optionally) the wireframe around each box.
+        - The zone's bounding box.
+        - Each box drawn as a filled cuboid with face colors corresponding to value density.
+        - (Optionally) the wireframe around each box.
+        - A color bar showing the mapping of value densities.
         """
         fig = plt.figure(figsize=(16, 8))
 
@@ -254,13 +255,15 @@ class BoxMoveEnv:
         draw_zone_bounding_box(ax0, ZONE0, color="black")
         draw_zone_bounding_box(ax1, ZONE1, color="black")
 
-        max_density = max(box.val_density() for box in self.boxes)
+        # Compute maximum value density for color mapping.
+        max_density = max(box.val_density() for box in self.boxes) if self.boxes else 1
+        norm = mcolors.Normalize(vmin=0, vmax=max_density)
+        sm = cm.ScalarMappable(norm=norm, cmap="coolwarm")
 
-        # Draw each box.
+        # Draw each box with a face color determined by its value density.
         for box in self.boxes:
             pos = box.pos
             size = box.size
-            zone = box.zone
             x, y, z = pos
             dx, dy, dz = size
 
@@ -286,17 +289,18 @@ class BoxMoveEnv:
                 [vertices[3], vertices[0], vertices[4], vertices[7]],  # left
             ]
 
-            # Choose subplot and color based on zone.
-            intensity = ((box.val_density() / max_density) + 1 ) / 2
-            if zone == 0:
-                face_color = np.array([0, 0, intensity])
-                ax = ax0
-            else:
-                face_color = np.array([intensity, 0, 0])
-                ax = ax1
+            # Use the colormap to map the box's value density to an RGBA color.
+            face_color = sm.to_rgba(box.val_density())
+
+            # Choose the subplot based on the box's zone.
+            ax = ax0 if box.zone == 0 else ax1
 
             poly3d = Poly3DCollection(faces, facecolors=face_color, edgecolors="none", alpha=0.7)
             ax.add_collection3d(poly3d)
+
+        # Create a color bar to show the mapping of value densities.
+        cbar = fig.colorbar(sm, ax=[ax0, ax1], fraction=0.02, pad=0.04)
+        cbar.set_label("Value Density")
 
         # Set labels and view angle.
         for ax in [ax0, ax1]:
@@ -305,5 +309,5 @@ class BoxMoveEnv:
             ax.set_zlabel("Z")
             ax.view_init(elev=20, azim=30)
 
-        plt.tight_layout()
         plt.show()
+

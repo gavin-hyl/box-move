@@ -1,4 +1,5 @@
 import numpy as np
+from tqdm import tqdm
 
 from BoxMoveEnvGym import BoxMoveEnvGym
 from Constants import DATA_DIR
@@ -17,7 +18,8 @@ def generate_training_data(num_episodes=50, max_steps=20):
     data = []
     env = BoxMoveEnvGym(horizon=50, n_boxes=15)
     
-    for ep in range(num_episodes):
+    # Wrap the episodes loop in tqdm for progress tracking.
+    for ep in tqdm(range(num_episodes), desc="Generating Episodes"):
         env.reset()
         done = False
         truncated = False
@@ -75,7 +77,7 @@ def save_data(data, filename):
         data: List of tuples (state_zone0, state_zone1, action_zone0, action_zone1, reward)
         filename: Name of the file to save the data.
     """
-    # states and actions sep
+    # Separate states and actions.
     state0 = [d[0] for d in data]
     state1 = [d[1] for d in data]
     action0 = [d[2] for d in data]
@@ -110,6 +112,6 @@ def load_data(filename):
 
 
 if __name__ == "__main__":
-    N_EP = 100
+    N_EP = 300
     training_data = generate_training_data(num_episodes=N_EP, max_steps=20)
     save_data(training_data, f"training_data{N_EP}")

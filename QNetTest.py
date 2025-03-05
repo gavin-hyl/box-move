@@ -63,9 +63,26 @@ def run_episode(env, policy, net=None, render=False):
             # Select a valid action at random.
             chosen_action = np.random.choice(valid_actions)
         elif policy == "greedy":
-            # Select the box with the highest value density.
-            pass
-            # And place it into the corner with lowest x, y coordinates.
+            # Greedy policy: select the box (in zone 0) with the highest value density,
+            # and choose the action that moves it to the corner with the lowest x, y coordinates.
+            best_density = -float('inf')
+            best_box = None
+            # Find the best box among those in zone 0.
+            for box in env.env.boxes:
+                if box.zone == 0 and box.val_density() > best_density:
+                    best_density = box.val_density()
+                    best_box = box
+            # If no box is found, fall back to a random valid action.
+            if best_box is None:
+                chosen_action = np.random.choice(valid_actions)
+            else:
+                # Filter actions corresponding to the best box.
+                candidate_actions = [action for action in valid_actions if action.pos_from == tuple(best_box.pos)]
+                # Choose the candidate that places the box at the target with the smallest (x, y) coordinates.
+                if candidate_actions:
+                    chosen_action = min(candidate_actions, key=lambda a: (a.pos_to[0], a.pos_to[1]))
+                else:
+                    chosen_action = np.random.choice(valid_actions)
         else:
             raise ValueError("Unknown policy specified: choose 'cnn' or 'random'.")
 
@@ -129,6 +146,14 @@ def main():
     print("\nCNN Policy:")
     print(f"  Average Reward: {cnn_avg_reward:.4f}")
     print(f"  Average Steps: {cnn_avg_steps:.2f}")
+
+    # Benchmark greedy policy.
+    print("Benchmarking Greedy policy...")
+    greedy_avg_reward, greedy_avg_steps = benchmark("greedy", num_episodes=num_episodes)
+    print("\nGreedy Policy:")
+    print(f"  Average Reward: {greedy_avg_reward:.4f}")
+    print(f"  Average Steps: {greedy_avg_steps:.2f}")
+    
 
 if __name__ == "__main__":
     main()

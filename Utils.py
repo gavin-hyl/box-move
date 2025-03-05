@@ -25,8 +25,9 @@ class LossTracker:
         if train_loss is not None:
             self.train_losses.append(train_loss)
     
-    def render(self):
+    def render(self, save_path="loss_plot.png"):
         plt.plot(self.val_losses, label="Validation Loss")
         plt.plot(self.train_losses, label="Training Loss")
         plt.legend()
-        plt.show()
+        # plt.show()
+        plt.savefig(save_path)

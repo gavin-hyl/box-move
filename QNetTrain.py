@@ -100,7 +100,7 @@ def main():
 
     model_path = f"{MODEL_DIR}/{FOLDER_NAME}/{MODEL_NAME}_epoch{epoch}.pth"
     tqdm.write(f"Training complete. Model saved as {model_path}")
-    tracker.render()
+    tracker.render(f"{MODEL_DIR}/{FOLDER_NAME}/{MODEL_NAME}_loss_plot.png")
 
 
 if __name__ == "__main__":

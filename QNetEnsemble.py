@@ -6,10 +6,8 @@ from Constants import ZONE0, ZONE1
 class QNetEnsemble(nn.Module):
     """
     A deep ensemble of CNN Q-networks with learnable ensemble weights.
-    Instead of simply averaging the predictions, this class learns a set of weights
-    (via a softmax over trainable logits) to combine the Q-value estimates from each network.
     """
-    def __init__(self, ensemble_size=5, base_channels=16, device='cpu'):
+    def __init__(self, ensemble_size=5, base_channels=32, device='cpu'):
         super(QNetEnsemble, self).__init__()
         self.ensemble_size = ensemble_size
         self.device = device

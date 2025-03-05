@@ -81,26 +81,7 @@ class CNNQNetwork(nn.Module):
         combined_features = torch.cat([state_features, action_features], dim=1)
         q_value = self.fc(combined_features)
         return q_value
-
-    def select_action(self, state_zone0, state_zone1, valid_actions):
-        """
-        Selects the action with the highest Q-value from the list of valid actions.
-        """
-        best_q = -float('inf')
-        best_action_idx = None
-
-        for i, action in enumerate(valid_actions):
-            action_zone0 = torch.tensor(action[0], dtype=torch.float32).unsqueeze(0).unsqueeze(0)
-            action_zone1 = torch.tensor(action[1], dtype=torch.float32).unsqueeze(0).unsqueeze(0)
-
-            with torch.no_grad():
-                q_value = self.forward(state_zone0, state_zone1, action_zone0, action_zone1)
-
-            if q_value.item() > best_q:
-                best_q = q_value.item()
-                best_action_idx = i
-
-        return best_action_idx, best_q
+    
 
 if __name__ == "__main__":
     # Quick test using dummy inputs.

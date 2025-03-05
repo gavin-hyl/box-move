@@ -155,6 +155,8 @@ def run_episode_ensemble(env, ensemble_model, render=False):
     steps = 0
     done = False
 
+    variances = []
+
     while not done:
         valid_actions = env.env.actions()
         if not valid_actions:
@@ -171,7 +173,8 @@ def run_episode_ensemble(env, ensemble_model, render=False):
             action_zone0 = torch.tensor(action_3d[0], dtype=torch.float32).unsqueeze(0).unsqueeze(0)
             action_zone1 = torch.tensor(action_3d[1], dtype=torch.float32).unsqueeze(0).unsqueeze(0)
             with torch.no_grad():
-                q_val, _ = ensemble_model(state_zone0, state_zone1, action_zone0, action_zone1)
+                q_val, variance = ensemble_model(state_zone0, state_zone1, action_zone0, action_zone1)
+            variances.append(variance.item())
             if q_val.item() > best_q:
                 best_q = q_val.item()
                 best_action = action
@@ -191,7 +194,7 @@ def run_episode_ensemble(env, ensemble_model, render=False):
         if render:
             env.render()
 
-    return total_reward, steps
+    return total_reward, steps, np.mean(variances)
 
 
 def benchmark_ensemble(num_episodes=20, ensemble_model=None):
@@ -204,12 +207,14 @@ def benchmark_ensemble(num_episodes=20, ensemble_model=None):
     """
     env = BoxMoveEnvGym(horizon=50, n_boxes=10)
     rewards = []
+    variances = []
     for ep in range(num_episodes):
-        total_reward, steps = run_episode_ensemble(env, ensemble_model)
+        total_reward, steps, var = run_episode_ensemble(env, ensemble_model)
         rewards.append(total_reward)
+        variances.append(var)
         print(f"[ENSEMBLE] Episode {ep+1}/{num_episodes}: Reward = {total_reward:.4f}, Steps = {steps}")
     avg_reward = np.mean(rewards)
-    print(f"[ENSEMBLE] Mean Reward = {avg_reward:.4f}, Variance = {np.var(rewards):.4f}\n")
+    print(f"[ENSEMBLE] Mean Reward = {avg_reward:.4f}, Variance = {np.var(rewards):.4f}, Variance of Q values = {np.mean(variances):.4f}\n")
 
 
 def parse_arguments():

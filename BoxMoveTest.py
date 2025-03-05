@@ -60,7 +60,7 @@ def gym_test():
         print("No valid action found. This might indicate the environment is in a terminal state.")
     else:
         print("Taking valid action index:", valid_action_index)
-        obs, reward, done, info = env.step(valid_action_index)
+        obs, reward, done, truncated, info = env.step(valid_action_index)
         print("After valid action:")
         print("Observation:\n", obs)
         print("Reward:", reward)
@@ -77,7 +77,7 @@ def gym_test():
     
     if invalid_action_index is not None:
         print("Taking invalid action index:", invalid_action_index)
-        obs, reward, done, info = env.step(invalid_action_index)
+        obs, reward, done, truncated, info = env.step(invalid_action_index)
         print("After invalid action:")
         print("Observation:\n", obs)
         print("Reward (expected penalty -1):", reward)
@@ -96,5 +96,5 @@ def gym_test():
 if __name__ == "__main__":
     # Uncomment the test(s) you want to run.
     box_test()
-    bme_test()
+    # bme_test()
     gym_test()

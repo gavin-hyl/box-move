@@ -134,3 +134,12 @@ class BoxMoveEnvGym(gym.Env):
         Closes the environment (e.g., closing matplotlib windows).
         """
         plt.close("all")
+
+    def set_boxes(self, boxes):
+        """
+        Sets the environment's boxes to the provided list.
+        
+        Args:
+            boxes (list): List of Box objects.
+        """
+        self.env.set_boxes(boxes)

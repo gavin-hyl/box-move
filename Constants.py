@@ -10,6 +10,8 @@ VAL_IDX = ZONE_IDX + 1
 BOX_DIM = VAL_IDX + 1
 
 REMOVE_DIR = 2  # 0, 1, 2 for x, y, z
+# ZONE0 = (4, 2, 2)
+# ZONE1 = (4, 2, 2)
 ZONE0 = (5, 4, 3)
 ZONE1 = (3, 3, 3)
 ZONE_SIZES = [ZONE0, ZONE1]

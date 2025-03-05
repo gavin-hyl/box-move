@@ -19,7 +19,7 @@ def main():
     # Initialize the environment and load the pretrained CNN.
     env = BoxMoveEnvGym(horizon=50, n_boxes=10)
     net = CNNQNetwork()
-    net.load_state_dict(torch.load(f"{MODEL_DIR}/cnn_qnet.pth"))
+    net.load_state_dict(torch.load(f"{MODEL_DIR}/vanilla/cnn_qnet.pth"))
     net.eval()  # Set network to evaluation mode.
     
     done = False

@@ -126,7 +126,7 @@ def main():
 
     print("\nBenchmarking CNN-based policy...")
     net = CNNQNetwork()
-    model_path = f"{MODEL_DIR}/cnn_qnet_v1_small_zone_1_epoch25.pth"
+    model_path = f"{MODEL_DIR}/vanilla/cnn_qnet_epoch45.pth"
     net.load_state_dict(torch.load(model_path))
     net.eval()
     benchmark("cnn", num_episodes=num_episodes, net=net)

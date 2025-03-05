@@ -26,6 +26,11 @@ class BoxMoveEnv:
         self._action_1d_map = {}
         self.reset(n_boxes=n_boxes)
 
+
+    # ==========================================================================
+    #                            Resetting Functions
+    # ==========================================================================
+
     def reset(self, n_boxes=0):
         if n_boxes == 0:
             n_boxes = self.n_boxes
@@ -74,6 +79,30 @@ class BoxMoveEnv:
             if np.array_equal(b.pos, np.array(pos)) and b.zone == zone:
                 return i
         return -1
+    
+    def set_boxes(self, boxes):
+        """
+        Given a list of Box objects, recalculates and returns the available top positions
+        for zone 0 and zone 1.
+        
+        For each zone, it starts with every tile (with z=0) as a candidate top position.
+        Then, for each box in that zone, it adds the points of its top face and removes 
+        the points of its bottom face.
+        
+        Args:
+            boxes (list): List of Box objects.
+            
+        Returns:
+            None
+        """
+        # Initialize candidate top positions for each zone.
+        self.zone0_top = {(x, y, 0) for x in range(ZONE0[0]) for y in range(ZONE0[1])}
+        self.zone1_top = {(x, y, 0) for x in range(ZONE1[0]) for y in range(ZONE1[1])}
+        
+        for box in boxes:
+            self.add_box_to_zone(box)
+        
+        self.boxes = boxes
 
     # ==========================================================================
     #                               MDP Functions

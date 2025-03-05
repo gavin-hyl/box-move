@@ -35,3 +35,11 @@ class Box:
                 points.append(self.pos + np.array([i, j, 0]))
         points = [tuple(point) for point in points]
         return set(points)
+
+    def array_rep(self):
+        """ Returns a numpy array representation of the box. """
+        return np.array([*self.pos, *self.size, self.zone, self.val])
+
+    def val_density(self):
+        """ Returns the value density of the box. """
+        return self.val / (self.size[0] * self.size[1] * self.size[2])

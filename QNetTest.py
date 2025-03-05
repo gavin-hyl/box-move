@@ -62,6 +62,10 @@ def run_episode(env, policy, net=None, render=False):
         elif policy == "random":
             # Select a valid action at random.
             chosen_action = np.random.choice(valid_actions)
+        elif policy == "greedy":
+            # Select the box with the highest value density.
+            pass
+            # And place it into the corner with lowest x, y coordinates.
         else:
             raise ValueError("Unknown policy specified: choose 'cnn' or 'random'.")
 

@@ -6,7 +6,7 @@ from mpl_toolkits.mplot3d.art3d import Poly3DCollection
 
 from Box import Box
 from BoxAction import BoxAction
-from Constants import ZONE0, ZONE1, zone0_dense_cpy, zone1_dense_cpy
+from Constants import ZONE0, ZONE1, zone0_dense_cpy, zone1_dense_cpy, BOX_DIM
 
 class BoxMoveEnv:
     # ==========================================================================
@@ -52,7 +52,7 @@ class BoxMoveEnv:
                 continue
             # Choose a random size that fits inside zone0 from the chosen position.
             size = np.random.randint(1, np.array(ZONE0) - np.array(pos_choice) + 1, size=3)
-            candidate_box = Box(np.array(pos_choice), size, 0, 1)
+            candidate_box = Box(np.array(pos_choice), size, 0, np.random.randint(1, 10))
             # Check that the candidate’s bottom face fits within the current available top tiles.
             if candidate_box.bottom_face() <= self.zone0_top:
                 boxes.append(candidate_box)
@@ -121,8 +121,10 @@ class BoxMoveEnv:
     def reward(self):
         # Use dense reward (proportional occupancy) when terminal or no actions available.
         if self.t == self.horizon or len(self.actions()) == 0:
-            total = sum(np.prod(box.size) for box in self.boxes if box.zone == 1)
-            return total / np.prod(ZONE1)
+            # total = sum(np.prod(box.size) for box in self.boxes if box.zone == 1)
+            # return total / np.prod(ZONE1)
+            z0, z1 = self.state_3d()
+            return np.sum(z1)
         else:
             return 0  # or use sparse rewards
 
@@ -136,6 +138,9 @@ class BoxMoveEnv:
         while len(boxes_copy) < max_boxes:
             # Create a dummy box (using zeros and a zone of -1) as placeholder.
             boxes_copy.append(Box(np.zeros(3, dtype=int), np.zeros(3, dtype=int), -1, 0))
+        state = np.zeros(max_boxes * BOX_DIM)
+        for i, box in enumerate(boxes_copy):
+            state[i * BOX_DIM : (i + 1) * BOX_DIM] = box.array_rep()
         return boxes_copy
 
     def state_3d(self):
@@ -147,9 +152,9 @@ class BoxMoveEnv:
             for offset in np.ndindex(s):
                 coord = tuple(np.add(p, offset))
                 if box.zone == 0:
-                    zone0_dense[coord] = i + 1
+                    zone0_dense[coord] = box.val_density()
                 else:
-                    zone1_dense[coord] = i + 1
+                    zone1_dense[coord] = box.val_density()
         return [zone0_dense, zone1_dense]
 
     def action_1d(self, action):
@@ -173,8 +178,8 @@ class BoxMoveEnv:
         zone0_dense = zone0_dense_cpy()
         zone1_dense = zone1_dense_cpy()
         for offset in np.ndindex(s):
-            zone0_dense[tuple(np.add(p_from, offset))] = idx + 1
-            zone1_dense[tuple(np.add(p_to, offset))] = idx + 1
+            zone0_dense[tuple(np.add(p_from, offset))] = -box.val_density()
+            zone1_dense[tuple(np.add(p_to, offset))] = box.val_density()
         return [zone0_dense, zone1_dense]
 
     # ==========================================================================
@@ -249,12 +254,13 @@ class BoxMoveEnv:
         draw_zone_bounding_box(ax0, ZONE0, color="black")
         draw_zone_bounding_box(ax1, ZONE1, color="black")
 
+        max_density = max(box.val_density() for box in self.boxes)
+
         # Draw each box.
         for box in self.boxes:
             pos = box.pos
             size = box.size
             zone = box.zone
-            box_index = self.get_box_index(pos, zone)
             x, y, z = pos
             dx, dy, dz = size
 
@@ -281,11 +287,12 @@ class BoxMoveEnv:
             ]
 
             # Choose subplot and color based on zone.
+            intensity = ((box.val_density() / max_density) + 1 ) / 2
             if zone == 0:
-                face_color = np.array([0, 0, 1 - box_index / (len(self.boxes) + 1) * 0.5])
+                face_color = np.array([0, 0, intensity])
                 ax = ax0
             else:
-                face_color = np.array([1 - box_index / (len(self.boxes) + 1) * 0.5, 0, 0])
+                face_color = np.array([intensity, 0, 0])
                 ax = ax1
 
             poly3d = Poly3DCollection(faces, facecolors=face_color, edgecolors="none", alpha=0.7)

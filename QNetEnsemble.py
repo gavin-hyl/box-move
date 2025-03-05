@@ -37,8 +37,7 @@ class QNetEnsemble(nn.Module):
         Returns:
             weighted_q: The weighted Q-value (tensor of shape [batch, 1]) after combining
                         the ensemble outputs.
-            all_q: A tensor of all ensemble predictions (shape [ensemble_size, batch, 1]).
-            weights: The softmax-normalized ensemble weights (tensor of shape [ensemble_size]).
+            variance: The variance of the ensemble predictions (tensor of shape [batch, 1]).
         """
         predictions = []
         for net in self.networks:
@@ -49,13 +48,12 @@ class QNetEnsemble(nn.Module):
         
         # Compute ensemble weights via softmax.
         weights = torch.softmax(self.ensemble_logits, dim=0)  # shape: [ensemble_size]
-        # Reshape for broadcasting: [ensemble_size, 1, 1]
         weights = weights.view(self.ensemble_size, 1, 1)
         
         # Compute the weighted average Q-value.
         weighted_q = torch.sum(weights * all_q, dim=0)
-        return weighted_q, all_q, weights
-
+        variance = torch.var(all_q, dim=0, unbiased=False)
+        return weighted_q, variance
 
     def load_state_dicts(self, state_dict_list):
         """

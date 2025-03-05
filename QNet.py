@@ -12,47 +12,55 @@ class CNNQNetwork(nn.Module):
         
         # --- State branches ---
         self.state_zone0_conv = nn.Sequential(
-            nn.Conv3d(in_channels=1, out_channels=base_channels, kernel_size=3, stride=1, padding=1),
+            nn.Conv3d(1, base_channels, kernel_size=3, stride=1, padding=1),
             nn.ReLU(),
-            nn.Conv3d(in_channels=base_channels, out_channels=base_channels * 2, kernel_size=3, stride=1, padding=1),
+            nn.Conv3d(base_channels, base_channels * 2, kernel_size=3, stride=1, padding=1),
             nn.ReLU(),
             nn.AdaptiveAvgPool3d(1)
         )
 
         self.state_zone1_conv = nn.Sequential(
-            nn.Conv3d(in_channels=1, out_channels=base_channels, kernel_size=3, stride=1, padding=1),
+            nn.Conv3d(1, base_channels, kernel_size=3, stride=1, padding=1),
             nn.ReLU(),
-            nn.Conv3d(in_channels=base_channels, out_channels=base_channels * 2, kernel_size=3, stride=1, padding=1),
+            nn.Conv3d(base_channels, base_channels * 2, kernel_size=3, stride=1, padding=1),
             nn.ReLU(),
             nn.AdaptiveAvgPool3d(1)
         )
         
         # --- Action branches ---
         self.action_zone0_conv = nn.Sequential(
-            nn.Conv3d(in_channels=1, out_channels=base_channels, kernel_size=3, stride=1, padding=1),
+            nn.Conv3d(1, base_channels, kernel_size=3, stride=1, padding=1),
             nn.ReLU(),
-            nn.Conv3d(in_channels=base_channels, out_channels=base_channels * 2, kernel_size=3, stride=1, padding=1),
+            nn.Conv3d(base_channels, base_channels * 2, kernel_size=3, stride=1, padding=1),
             nn.ReLU(),
             nn.AdaptiveAvgPool3d(1)
         )
 
         self.action_zone1_conv = nn.Sequential(
-            nn.Conv3d(in_channels=1, out_channels=base_channels, kernel_size=3, stride=1, padding=1),
+            nn.Conv3d(1, base_channels, kernel_size=3, stride=1, padding=1),
             nn.ReLU(),
-            nn.Conv3d(in_channels=base_channels, out_channels=base_channels * 2, kernel_size=3, stride=1, padding=1),
+            nn.Conv3d(base_channels, base_channels * 2, kernel_size=3, stride=1, padding=1),
             nn.ReLU(),
             nn.AdaptiveAvgPool3d(1)
         )
         
-        # After adaptive pooling, each branch produces a tensor of shape [batch, base_channels*2, 1, 1, 1].
-        # Flattening gives base_channels*2 features per branch.
-        # For state, we have two branches -> total state features = base_channels*4.
-        # Similarly for action.
-        # Concatenated, the combined feature vector has (base_channels*4)*2 = base_channels*8 features.
-        fc_input_dim = base_channels * 8
+        # Use dummy inputs to determine the flattened dimension.
+        dummy_state = torch.zeros(1, 1, *ZONE0)  # shape: [1,1,5,4,3]
+        dummy_action = torch.zeros(1, 1, *ZONE0) # using same dims for simplicity
+        # Forward through one branch:
+        out_state0 = self.state_zone0_conv(dummy_state)
+        flat_state0 = out_state0.view(1, -1)  # should be [1, base_channels*2]
+        
+        # Do it for one state branch and one action branch.
+        fc_input_dim_branch = flat_state0.shape[1]  # number of features per branch
+        
+        # We have four branches (state_zone0, state_zone1, action_zone0, action_zone1).
+        total_fc_input_dim = fc_input_dim_branch * 4
+        
+        print("Total FC input dimension:", total_fc_input_dim)
         
         self.fc = nn.Sequential(
-            nn.Linear(fc_input_dim, 64),
+            nn.Linear(total_fc_input_dim, 64),
             nn.ReLU(),
             nn.Linear(64, 1)
         )

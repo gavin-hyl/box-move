@@ -43,7 +43,7 @@ def main():
     optimizer = optim.Adam(net.parameters(), lr=0.001)
     loss_fn = nn.MSELoss()
     
-    num_epochs = 30
+    num_epochs = 50
     print("Starting training...")
     tracker = LossTracker(patience=10)
     

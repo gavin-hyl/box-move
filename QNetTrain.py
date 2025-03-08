@@ -1,107 +1,134 @@
-import numpy as np
-import torch
-import torch.nn as nn
-import torch.optim as optim
-from torch.utils.data import TensorDataset, DataLoader, random_split
-from tqdm import tqdm
 import os
-
-# Import our environment and constants.
-from Constants import MODEL_DIR
-from QNet import CNNQNetwork
-from Utils import LossTracker
-from DataHandling import load_data
-
+import time
 import argparse
+import torch
+import psutil
+import cProfile
+import pstats
 
+from BoxMoveEnvGym import BoxMoveEnvGym
+from optimized_dqn import OptimizedDQN  # Ensure this file is in the same directory
 
+def parse_args():
+    parser = argparse.ArgumentParser(description="Train an optimized DQN agent on the BoxMoveEnv")
+    parser.add_argument("--timesteps", type=int, default=10000, help="Total timesteps to train")
+    parser.add_argument("--horizon", type=int, default=50, help="Episode horizon")
+    parser.add_argument("--n_boxes", type=int, default=10, help="Number of boxes")
+    parser.add_argument("--seed", type=int, default=42, help="Random seed")
+    parser.add_argument("--batch_size", type=int, default=32, help="Batch size")
+    parser.add_argument("--buffer_size", type=int, default=100000, help="Replay buffer size")
+    parser.add_argument("--lr", type=float, default=3e-4, help="Learning rate")
+    parser.add_argument("--gamma", type=float, default=0.99, help="Discount factor")
+    parser.add_argument("--train_freq", type=int, default=4, help="Train frequency")
+    parser.add_argument("--target_update", type=int, default=1000, help="Target network update interval")
+    parser.add_argument("--soft_update", action="store_true", help="Use soft target updates")
+    parser.add_argument("--tau", type=float, default=0.005, help="Soft update coefficient (if enabled)")
+    parser.add_argument("--env_pool_size", type=int, default=8, help="Environment pool size")
+    parser.add_argument("--eval_freq", type=int, default=5000, help="Evaluation frequency")
+    parser.add_argument("--log_freq", type=int, default=1000, help="Logging frequency")
+    parser.add_argument("--output_dir", type=str, default="optimized_results", help="Output directory")
+    parser.add_argument("--device", type=str, default="auto", help="Device (auto, cuda, cpu)")
+    parser.add_argument("--resume", type=str, default=None, help="Path to model to resume training")
+    
+    return parser.parse_args()
 
+def print_system_info():
+    """Print system information for debugging."""
+    print("\n--- System Information ---")
+    print(f"CPU cores: {psutil.cpu_count(logical=False)} physical, {psutil.cpu_count()} logical")
+    mem = psutil.virtual_memory()
+    print(f"Memory: {mem.total / (1024**3):.2f} GB total, {mem.available / (1024**3):.2f} GB available")
+    if torch.cuda.is_available():
+        print(f"CUDA available: Yes, device count: {torch.cuda.device_count()}")
+        for i in range(torch.cuda.device_count()):
+            print(f"  Device {i}: {torch.cuda.get_device_name(i)}")
+            print(f"    Memory: {torch.cuda.get_device_properties(i).total_memory / (1024**3):.2f} GB")
+    else:
+        print("CUDA available: No")
+    print(f"PyTorch version: {torch.__version__}")
+    print("---------------------\n")
 
 def main():
-    # Set up command line arguments
-    parser = argparse.ArgumentParser(description='Train the Q-Network')
-    parser.add_argument('--model-name', default='cnn_qnet', type=str,
-                       help='Name of the model')
-    parser.add_argument('--folder-name', default='vanilla', type=str,
-                        help='Name of the folder to save the model')
-    args = parser.parse_args()
-
-    MODEL_NAME = args.model_name
-    FOLDER_NAME = args.folder_name
-
-    print("Generating training data...")
-    data = load_data("small_zone_1", "training_data300")
-    print(f"Loaded {len(data)} samples.")
+    args = parse_args()
     
-    # Convert samples into torch tensors.
-    # For each zone, add a channel dimension to get shape [batch_size, 1, D, H, W].
-    states_zone0 = torch.tensor(np.array([sample[0] for sample in data]), dtype=torch.float32).unsqueeze(1)
-    states_zone1 = torch.tensor(np.array([sample[1] for sample in data]), dtype=torch.float32).unsqueeze(1)
-    actions_zone0 = torch.tensor(np.array([sample[2] for sample in data]), dtype=torch.float32).unsqueeze(1)
-    actions_zone1 = torch.tensor(np.array([sample[3] for sample in data]), dtype=torch.float32).unsqueeze(1)
-    rewards = torch.tensor(np.array([sample[4] for sample in data]), dtype=torch.float32).unsqueeze(1)
+    os.makedirs(args.output_dir, exist_ok=True)
     
-    # Create a dataset with separate inputs for each zone.
-    dataset = TensorDataset(states_zone0, states_zone1, actions_zone0, actions_zone1, rewards)
+    print_system_info()
     
-    # Split the dataset into training and validation sets (80% training, 20% validation).
-    train_size = int(0.8 * len(dataset))
-    val_size = len(dataset) - train_size
-    train_dataset, val_dataset = random_split(dataset, [train_size, val_size])
+    print("Training an optimized DQN agent with the following parameters:")
+    for arg in vars(args):
+        print(f"  {arg}: {getattr(args, arg)}")
     
-    train_loader = DataLoader(train_dataset, batch_size=32, shuffle=True)
-    val_loader = DataLoader(val_dataset, batch_size=32, shuffle=False)
+    env = BoxMoveEnvGym(horizon=args.horizon, n_boxes=args.n_boxes, seed=args.seed)
     
-    # Instantiate the CNN Q-network.
-    net = CNNQNetwork()
-    optimizer = optim.Adam(net.parameters(), lr=0.001)
-    loss_fn = nn.SmoothL1Loss()
+    if args.device == "auto":
+        device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    else:
+        device = torch.device(args.device)
     
-    num_epochs = 50
-    print("Starting training...")
-    tracker = LossTracker(patience=10)
+    print(f"Using device: {device}")
     
-    for epoch in tqdm(range(num_epochs), desc="Epochs", unit="epoch"):
-        # Training phase
-        net.train()
-        epoch_train_loss = 0.0
-        for state_z0_batch, state_z1_batch, action_z0_batch, action_z1_batch, reward_batch in tqdm(train_loader, desc="Train batches", leave=False):
-            optimizer.zero_grad()
-            q_pred = net(state_z0_batch, state_z1_batch, action_z0_batch, action_z1_batch)
-            loss = loss_fn(q_pred, reward_batch)
-            loss.backward()
-            optimizer.step()
-            epoch_train_loss += loss.item() * state_z0_batch.size(0)
-        epoch_train_loss /= train_size
-        
-        # Validation phase
-        net.eval()
-        epoch_val_loss = 0.0
-        with torch.no_grad():
-            for state_z0_batch, state_z1_batch, action_z0_batch, action_z1_batch, reward_batch in tqdm(val_loader, desc="Val batches", leave=False):
-                q_pred = net(state_z0_batch, state_z1_batch, action_z0_batch, action_z1_batch)
-                loss = loss_fn(q_pred, reward_batch)
-                epoch_val_loss += loss.item() * state_z0_batch.size(0)
-        epoch_val_loss /= val_size
-        
-        tqdm.write(f"Epoch {epoch + 1}/{num_epochs}, Train Loss: {epoch_train_loss:.4f}, Val Loss: {epoch_val_loss:.4f}")
-        
-        # Early stopping check
-        tracker(epoch_train_loss, epoch_val_loss)
-        if tracker.early_stop:
-            tqdm.write("Early stopping triggered.")
-            break
-        
-        if epoch % 5 == 0:
-            model_path = f"{MODEL_DIR}/{FOLDER_NAME}/{MODEL_NAME}_epoch{epoch}.pth"
-            if not os.path.exists(f"{MODEL_DIR}/{FOLDER_NAME}"):
-                os.makedirs(f"{MODEL_DIR}/{FOLDER_NAME}")
-            torch.save(net.state_dict(), model_path)
-
-    model_path = f"{MODEL_DIR}/{FOLDER_NAME}/{MODEL_NAME}_epoch{epoch}.pth"
-    tqdm.write(f"Training complete. Model saved as {model_path}")
-    tracker.render(f"{MODEL_DIR}/{FOLDER_NAME}/{MODEL_NAME}_loss_plot.png")
-
+    tau = args.tau if args.soft_update else 1.0
+    dqn = OptimizedDQN(
+        env=env,
+        learning_rate=args.lr,
+        buffer_size=args.buffer_size,
+        learning_starts=1000,  # Start training after 1000 steps
+        batch_size=args.batch_size,
+        tau=tau,
+        gamma=args.gamma,
+        train_freq=args.train_freq,
+        target_update_interval=args.target_update,
+        seed=args.seed,
+        device=device,
+        env_pool_size=args.env_pool_size
+    )
+    
+    if args.resume:
+        print(f"Resuming training from {args.resume}")
+        dqn.load(args.resume)
+    
+    # --- Start profiling ---
+    profiler = cProfile.Profile()
+    profiler.enable()
+    
+    start_time = time.time()
+    try:
+        dqn.learn(
+            total_timesteps=args.timesteps,
+            eval_freq=args.eval_freq,
+            log_freq=args.log_freq
+        )
+    except KeyboardInterrupt:
+        print("\nTraining interrupted by user")
+    
+    profiler.disable()
+    elapsed_time = time.time() - start_time
+    
+    print(f"Training took: {elapsed_time:.2f} seconds")
+    
+    # Print profiling results (top 20 functions by cumulative time)
+    stats = pstats.Stats(profiler).sort_stats("cumtime")
+    stats.print_stats(20)
+    # --- End profiling ---
+    
+    model_path = os.path.join(args.output_dir, "optimized_dqn_final.pt")
+    dqn.save(model_path)
+    dqn.plot_learning_curve(save_path=os.path.join(args.output_dir, "learning_curve.png"))
+    
+    print("\nRunning final evaluation...")
+    mean_reward, mean_length = dqn.evaluate(num_episodes=20)
+    
+    with open(os.path.join(args.output_dir, "evaluation_results.txt"), 'w') as f:
+        f.write("Final evaluation results:\n")
+        f.write(f"Mean reward: {mean_reward:.2f}\n")
+        f.write(f"Mean episode length: {mean_length:.2f}\n\n")
+        f.write("Training parameters:\n")
+        for arg in vars(args):
+            f.write(f"{arg}: {getattr(args, arg)}\n")
+        f.write(f"\nTraining time: {elapsed_time:.2f} seconds\n")
+    
+    print(f"All results saved to {args.output_dir}")
 
 if __name__ == "__main__":
     main()

@@ -1,0 +1,25 @@
+Final evaluation results:
+Mean reward: 32.20
+Mean episode length: 6.95
+
+Training parameters:
+timesteps: 2000
+horizon: 50
+n_boxes: 10
+seed: 42
+batch_size: 32
+buffer_size: 100000
+lr: 0.0003
+gamma: 0.99
+train_freq: 4
+target_update: 500
+soft_update: False
+tau: 0.005
+env_pool_size: 8
+eval_freq: 1000
+log_freq: 250
+output_dir: optimized_results
+device: auto
+resume: None
+
+Training time: 69.47 seconds

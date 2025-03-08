@@ -14,7 +14,10 @@ class BoxMoveEnv:
     # ==========================================================================
     #                               Initialization
     # ==========================================================================
-    def __init__(self, horizon=100, gamma=1, n_boxes=5):
+    def __init__(self, horizon=100, gamma=1, n_boxes=5, seed=None):
+        if seed is not None:
+            random.seed(seed)
+            np.random.seed(seed)
         self.horizon = horizon
         self.gamma = gamma
         self.t = 0  # time step

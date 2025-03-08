@@ -13,7 +13,7 @@ REMOVE_DIR = 2  # 0, 1, 2 for x, y, z
 # ZONE0 = (4, 2, 2)
 # ZONE1 = (4, 2, 2)
 ZONE0 = (5, 4, 3)
-ZONE1 = (3, 3, 3)
+ZONE1 = (3, 2, 3)
 ZONE_SIZES = [ZONE0, ZONE1]
 def zone0_dense_cpy():
     return np.zeros(ZONE0, dtype=int)

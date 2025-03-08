@@ -17,10 +17,10 @@ class BoxMoveEnvGym(gym.Env):
     """
     metadata = {"render.modes": ["human"]}
 
-    def __init__(self, horizon=100, gamma=1, n_boxes=5):
+    def __init__(self, horizon=100, gamma=1, n_boxes=5, seed=None):
         super().__init__()
         # Instantiate the underlying BoxMoveEnv
-        self.env = BoxMoveEnv(horizon, gamma, n_boxes)
+        self.env = BoxMoveEnv(horizon, gamma, n_boxes, seed)
 
         # Define a discrete action space based on all possible moves from zone0 to zone1.
         total_actions = np.prod(ZONE0) * np.prod(ZONE1)

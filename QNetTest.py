@@ -1,4 +1,7 @@
+#!/usr/bin/env python
+
 import time
+import random
 import numpy as np
 import torch
 import os
@@ -101,23 +104,29 @@ def run_episode_policy(env, policy, net=None, render=False):
     return total_reward, steps
 
 
-def benchmark_policy(policy, num_episodes=50, net=None):
+def benchmark_policy(policy, num_episodes=50, net=None, seeds=None):
     """
-    Benchmarks a given policy over multiple episodes.
+    Benchmarks a given policy over multiple episodes using a fixed list of seeds.
 
     Args:
         policy (str): Policy to use: "cnn", "random", or "greedy".
         num_episodes (int): Number of episodes to run.
         net (CNNQNetwork): CNN Q-network (required for "cnn" policy).
+        seeds (list): List of seeds (length should equal num_episodes).
     """
-    env = BoxMoveEnvGym(horizon=50, n_boxes=10)
     rewards = []
     for ep in range(num_episodes):
+        if seeds is not None:
+            seed = seeds[ep]
+            random.seed(seed)
+            np.random.seed(seed)
+            torch.manual_seed(seed)
+        env = BoxMoveEnvGym(horizon=50, n_boxes=10)
         total_reward, steps = run_episode_policy(env, policy, net=net)
         rewards.append(total_reward)
         print(f"[{policy.upper()}] Episode {ep+1}/{num_episodes}: Reward = {total_reward:.4f}, Steps = {steps}")
     avg_reward = np.mean(rewards)
-    print(f"[{policy.upper()}] Mean Reward = {avg_reward:.4f}, Variance = {np.var(rewards):.4f}\n")
+    print(f"[{policy.upper()}] Mean Reward = {avg_reward:.4f}\n")
 
 
 def load_ensemble_model(ensemble_model_prefix, ensemble_size, device):
@@ -148,7 +157,7 @@ def run_episode_ensemble(env, ensemble_model, render=False):
         render (bool): If True, render the environment.
 
     Returns:
-        tuple: (total_reward, steps) from the episode.
+        tuple: (total_reward, steps, avg_variance) from the episode.
     """
     obs = env.reset()
     total_reward = 0.0
@@ -194,27 +203,31 @@ def run_episode_ensemble(env, ensemble_model, render=False):
         if render:
             env.render()
 
-    return total_reward, steps, np.mean(variances)
+    avg_variance = np.mean(variances) if variances else 0.0
+    return total_reward, steps, avg_variance
 
 
-def benchmark_ensemble(num_episodes=20, ensemble_model=None):
+def benchmark_ensemble(num_episodes=20, ensemble_model=None, seeds=None):
     """
-    Benchmarks the ensemble model over multiple episodes.
+    Benchmarks the ensemble model over multiple episodes using a fixed list of seeds.
 
     Args:
         num_episodes (int): Number of episodes to run.
         ensemble_model (QNetEnsemble): The ensemble Q-network.
+        seeds (list): List of seeds (length should equal num_episodes).
     """
-    env = BoxMoveEnvGym(horizon=50, n_boxes=10)
     rewards = []
     variances = []
     for ep in range(num_episodes):
-        total_reward, steps, var = run_episode_ensemble(env, ensemble_model)
+        if seeds is not None:
+            env = BoxMoveEnvGym(horizon=50, n_boxes=10, seed=seeds[ep])
+        total_reward, steps, avg_var = run_episode_ensemble(env, ensemble_model)
         rewards.append(total_reward)
-        variances.append(var)
+        variances.append(avg_var)
         print(f"[ENSEMBLE] Episode {ep+1}/{num_episodes}: Reward = {total_reward:.4f}, Steps = {steps}")
     avg_reward = np.mean(rewards)
-    print(f"[ENSEMBLE] Mean Reward = {avg_reward:.4f}, Variance = {np.var(rewards):.4f}, Variance of Q values = {np.mean(variances):.4f}\n")
+    print(f"[ENSEMBLE] Mean Reward = {avg_reward:.4f}",
+          f"Mean Q Variance = {np.mean(variances):.4f}\n")
 
 
 def parse_arguments():
@@ -251,26 +264,29 @@ def parse_arguments():
 
 def main():
     args = parse_arguments()
+    num_eps = args.num_episodes
+    # Generate a fixed list of seeds (one per episode)
+    seeds = list(range(num_eps))
 
     print("\n=== Benchmarking RANDOM Policy ===")
-    benchmark_policy("random", num_episodes=args.num_episodes)
+    benchmark_policy("random", num_episodes=num_eps, seeds=seeds)
 
     print("\n=== Benchmarking GREEDY Policy ===")
-    benchmark_policy("greedy", num_episodes=args.num_episodes)
+    benchmark_policy("greedy", num_episodes=num_eps, seeds=seeds)
 
     print("\n=== Benchmarking CNN Policy ===")
     net = CNNQNetwork()
     net.load_state_dict(torch.load(args.model_path, map_location="cpu"))
     net.eval()
-    benchmark_policy("cnn", num_episodes=args.num_episodes, net=net)
+    benchmark_policy("cnn", num_episodes=num_eps, net=net, seeds=seeds)
 
     print("\n=== Benchmarking ENSEMBLE Policy ===")
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    # Force CPU to avoid conv3d CUDA issues:
     device = torch.device("cpu")
     ensemble_model = load_ensemble_model(args.ensemble_prefix, args.ensemble_size, device)
     print("Loaded ensemble model. Ensemble weights (softmax):",
           torch.softmax(ensemble_model.ensemble_logits, dim=0))
-    benchmark_ensemble(num_episodes=args.num_episodes, ensemble_model=ensemble_model)
+    benchmark_ensemble(num_episodes=num_eps, ensemble_model=ensemble_model, seeds=seeds)
 
 
 if __name__ == "__main__":

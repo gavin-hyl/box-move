@@ -1,16 +1,15 @@
-=== Box Move Environment Agent Comparison ===
+=== Box Move Environment Policy Comparison ===
 
-Configuration: 20 episodes, 4 boxes, horizon 20
-
---- Random Policy ---
-Mean Reward: -0.95 ± 0.22
-Mean Episode Length: 0.95
-Success Rate: 0.00%
+Configuration: 50 episodes, 6 boxes, horizon 30
 
 --- DQN Policy ---
-Mean Reward: 11.20 ± 6.25
-Mean Episode Length: 2.80
-Success Rate: 90.00%
+Mean Reward: 17.04 ± 7.63
+Mean Episode Length: 4.04
+Success Rate: 98.00%
 
---- Performance Comparison ---
-DQN vs Random: 1278.95% improvement in reward
+--- Random Policy (Valid Actions) ---
+Mean Reward: 16.74 ± 7.44
+Mean Episode Length: 3.98
+Success Rate: 98.00%
+
+DQN vs Random: 1.79% improvement in reward

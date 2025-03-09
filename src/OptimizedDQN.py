@@ -7,10 +7,34 @@ import torch.nn as nn
 import torch.optim as optim
 from torch.nn.functional import mse_loss
 from tqdm import tqdm
+import sys
+
+# Add the parent directory to the path so we can import from src
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 # Import your environment and model components
-from BoxMoveEnvGym import BoxMoveEnvGym
-from QNet import CNNQNetwork, DuelingQNetwork
+from src.BoxMoveEnvGym import BoxMoveEnvGym
+from src.QNet import CNNQNetwork
+
+# Linear schedule for epsilon decay
+class LinearSchedule:
+    def __init__(self, schedule_timesteps, final_p, initial_p=1.0):
+        """Linear interpolation between initial_p and final_p over schedule_timesteps.
+        After this many timesteps pass final_p is returned.
+        
+        Args:
+            schedule_timesteps: Number of timesteps for which to linearly anneal initial_p to final_p
+            initial_p: Initial output value
+            final_p: Final output value
+        """
+        self.schedule_timesteps = schedule_timesteps
+        self.final_p = final_p
+        self.initial_p = initial_p
+
+    def value(self, t):
+        """See Schedule.value"""
+        fraction = min(float(t) / self.schedule_timesteps, 1.0)
+        return self.initial_p + fraction * (self.final_p - self.initial_p)
 
 # Optimized replay buffer for dict observation spaces
 class OptimizedReplayBuffer:
@@ -69,89 +93,6 @@ class OptimizedReplayBuffer:
     def __len__(self):
         return self.buffer_size if self.full else self.pos
 
-# Add a prioritized replay buffer for better sample efficiency
-class PrioritizedReplayBuffer(OptimizedReplayBuffer):
-    def __init__(self, buffer_size, observation_space, action_space, device=torch.device("cpu"), alpha=0.6, beta_start=0.4, beta_frames=100000):
-        super().__init__(buffer_size, observation_space, action_space, device)
-        
-        # Parameters for prioritized replay
-        self.alpha = alpha  # Controls how much prioritization to use (0 = no prioritization, 1 = full prioritization)
-        self.beta_start = beta_start  # Initial value of beta for importance sampling
-        self.beta_frames = beta_frames  # Number of frames over which to anneal beta to 1
-        self.beta = beta_start  # Current beta value
-        self.max_priority = 1.0  # Initial max priority for new experiences
-        
-        # Create array for priorities
-        self.priorities = np.zeros((buffer_size, 1), dtype=np.float32)
-        
-    def add(self, obs, next_obs, action, reward, done, info):
-        # Add experience with max priority
-        for key in self.observations.keys():
-            self.observations[key][self.pos] = obs[key].astype(np.float32)
-            self.next_observations[key][self.pos] = next_obs[key].astype(np.float32)
-        
-        self.actions[self.pos] = action
-        self.rewards[self.pos] = reward
-        self.dones[self.pos] = float(done)
-        self.priorities[self.pos] = self.max_priority
-        
-        self.pos += 1
-        if self.pos == self.buffer_size:
-            self.full = True
-            self.pos = 0
-    
-    def sample(self, batch_size, beta=None):
-        # Update beta value if provided
-        if beta is not None:
-            self.beta = beta
-        
-        # Calculate sampling probabilities based on priorities
-        if self.full:
-            prios = self.priorities[:self.buffer_size]
-        else:
-            prios = self.priorities[:self.pos]
-        
-        # Convert priorities to probabilities (with alpha for prioritization control)
-        probs = prios ** self.alpha
-        probs = probs / np.sum(probs)
-        
-        # Sample indices based on priorities
-        indices = np.random.choice(len(probs), batch_size, p=probs.flatten(), replace=True)
-        
-        # Calculate importance sampling weights
-        weights = (len(probs) * probs[indices]) ** (-self.beta)
-        weights = weights / np.max(weights)  # Normalize weights
-        
-        # Get samples
-        obs = {}
-        next_obs = {}
-        for key in self.observations.keys():
-            obs[key] = torch.as_tensor(self.observations[key][indices], device=self.device)
-            next_obs[key] = torch.as_tensor(self.next_observations[key][indices], device=self.device)
-        
-        batch = {
-            "obs": obs,
-            "next_obs": next_obs,
-            "actions": torch.as_tensor(self.actions[indices], device=self.device),
-            "rewards": torch.as_tensor(self.rewards[indices], device=self.device),
-            "dones": torch.as_tensor(self.dones[indices], device=self.device),
-            "weights": torch.as_tensor(weights, device=self.device),
-            "indices": indices
-        }
-        
-        return batch
-    
-    def update_priorities(self, indices, priorities):
-        """Update priorities of sampled transitions."""
-        for idx, priority in zip(indices, priorities):
-            self.priorities[idx] = priority
-            self.max_priority = max(self.max_priority, priority)
-            
-    def update_beta(self, frame_idx):
-        """Update beta value based on current frame."""
-        self.beta = min(1.0, self.beta_start + frame_idx * (1.0 - self.beta_start) / self.beta_frames)
-        return self.beta
-
 class OptimizedDQN:
     """
     Optimized DQN implementation with improvements to reduce Python-level loop overhead
@@ -159,146 +100,123 @@ class OptimizedDQN:
     """
     def __init__(
         self,
-        env: BoxMoveEnvGym,
-        learning_rate: float = 1e-4,
-        buffer_size: int = 10000, 
-        learning_starts: int = 50000,
-        batch_size: int = 32,
-        tau: float = 1.0,
-        gamma: float = 0.99,
-        train_freq: int = 4,
-        target_update_interval: int = 10000,
-        exploration_fraction: float = 0.1,
-        exploration_initial_eps: float = 1.0,
-        exploration_final_eps: float = 0.05,
-        device: str = "auto",
-        seed: int = None,
-        env_pool_size: int = 8,
-        use_prioritized_replay: bool = True,  # Enable prioritized replay by default
-        use_dueling_network: bool = True,     # Enable dueling network by default
-        use_reward_shaping: bool = True,      # Enable reward shaping by default
-        alpha: float = 0.6,                   # Priority exponent
-        beta_start: float = 0.4,              # Initial importance sampling weight
-        double_q: bool = True                 # Use double Q-learning
+        env,
+        learning_rate=3e-4,
+        buffer_size=10000,
+        batch_size=64,
+        gamma=0.99,
+        tau=0.005,
+        target_update_interval=500,
+        train_freq=1,
+        gradient_steps=1,
+        exploration_fraction=0.2,
+        exploration_initial_eps=1.0,
+        exploration_final_eps=0.05,
+        max_grad_norm=10,
+        device="auto",
+        seed=None,
+        env_pool_size=1,
+        optimize_memory_usage=False,
+        double_q=False,
+        learning_starts=100
     ):
-        self.env = env
+        self.observation_space = env.observation_space
+        self.action_space = env.action_space
         self.learning_rate = learning_rate
         self.buffer_size = buffer_size
-        self.learning_starts = learning_starts
         self.batch_size = batch_size
-        self.tau = tau
         self.gamma = gamma
-        self.train_freq = train_freq
+        self.tau = tau
         self.target_update_interval = target_update_interval
+        self.train_freq = train_freq
+        self.gradient_steps = gradient_steps
         self.exploration_fraction = exploration_fraction
         self.exploration_initial_eps = exploration_initial_eps
         self.exploration_final_eps = exploration_final_eps
-        self.env_pool_size = env_pool_size
-        self.env_pool = []
-        self.env_pool_index = 0
+        self.max_grad_norm = max_grad_norm
         
-        # New parameters
-        self.use_prioritized_replay = use_prioritized_replay
-        self.use_dueling_network = use_dueling_network
-        self.use_reward_shaping = use_reward_shaping
-        self.alpha = alpha
-        self.beta_start = beta_start
-        self.double_q = double_q
-        
-        # Initialize reward tracking and statistics
-        self.episode_returns = []
-        self.moving_avg_return = 0
-        self.best_return = float('-inf')
-
+        # Set device
         if device == "auto":
             self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         else:
             self.device = torch.device(device)
+        
         print(f"Using device: {self.device}")
         
+        # Store environment
+        self.env = env
+        self.optimize_memory_usage = optimize_memory_usage
+        
+        # Set random seed
         if seed is not None:
-            random.seed(seed)
-            np.random.seed(seed)
             torch.manual_seed(seed)
+            torch.cuda.manual_seed(seed)
+            np.random.seed(seed)
+            random.seed(seed)
             self.env.reset(seed=seed)
         
-        # Create appropriate network architecture
-        if self.use_dueling_network:
-            self.q_network = DuelingQNetwork().to(self.device)
-            self.target_q_network = DuelingQNetwork().to(self.device)
-            print("Using Dueling Q-Network architecture")
-        else:
-            self.q_network = CNNQNetwork().to(self.device)
-            self.target_q_network = CNNQNetwork().to(self.device)
-            print("Using standard CNN Q-Network architecture")
-            
-        # Initialize weights with Xavier/Glorot initialization
-        for module in self.q_network.modules():
-            if isinstance(module, nn.Linear) or isinstance(module, nn.Conv3d):
-                nn.init.xavier_uniform_(module.weight)
-                if module.bias is not None:
-                    nn.init.zeros_(module.bias)
+        # Create Q-network
+        self.q_network = CNNQNetwork().to(self.device)
+        self.target_q_network = CNNQNetwork().to(self.device)
         
+        # Update target network
         self.target_q_network.load_state_dict(self.q_network.state_dict())
         self.target_q_network.eval()
         
         self.optimizer = optim.Adam(self.q_network.parameters(), lr=self.learning_rate)
         self._setup_action_mapping()
         
-        # Create appropriate replay buffer
-        if self.use_prioritized_replay:
-            self.replay_buffer = PrioritizedReplayBuffer(
-                buffer_size=buffer_size,
-                observation_space=env.observation_space,
-                action_space=env.action_space,
-                device=self.device,
-                alpha=self.alpha,
-                beta_start=self.beta_start
-            )
-            print("Using Prioritized Experience Replay")
-        else:
-            self.replay_buffer = OptimizedReplayBuffer(
-                buffer_size=buffer_size,
-                observation_space=env.observation_space,
-                action_space=env.action_space,
-                device=self.device
-            )
-            print("Using Standard Experience Replay")
-            
-        self.exploration_rate = exploration_initial_eps
+        # Create replay buffer
+        self.replay_buffer = OptimizedReplayBuffer(
+            buffer_size=buffer_size,
+            observation_space=env.observation_space,
+            action_space=env.action_space,
+            device=self.device
+        )
+        print("Using Standard Experience Replay")
         
-        self.losses = []
+        # Environment pool for parallel collection
+        self.env_pool_size = env_pool_size
+        
+        # Training info
+        self.num_timesteps = 0
+        self.num_episodes = 0
         self.episode_rewards = []
         self.episode_lengths = []
-        self.last_episode_reward = 0
-        self.episode_timesteps = 0
-        self.total_episodes = 0
-        self.num_timesteps = 0
+        self.updates = 0
+        self.loss_history = []
+        self.reward_history = []
+        self.success_rate_history = []
         
-        self._action_tensor_cache = {}
-        self._initialize_env_pool()
+        # Exploration parameters
+        self.exploration_schedule = LinearSchedule(
+            schedule_timesteps=int(exploration_fraction * 5000),
+            initial_p=exploration_initial_eps,
+            final_p=exploration_final_eps
+        )
+        
+        # Additional features
+        self.double_q = double_q
+        
+        # Add learning_starts attribute
+        self.learning_starts = learning_starts
+        
+        # Add episode tracking
+        self.episode_timesteps = 0
+        self.last_episode_reward = 0
+        self.best_return = float('-inf')
+        
+        # Add caching attributes
+        self._last_state = None
         self._cached_valid_actions = None
         self._cached_valid_action_tensors = None
-        self._last_state = None
         self._q_value_cache = {}
+        self._action_tensor_cache = {}
+        
+        # Initialize environment pool
+        self.env_pool = [env]
+        self.env_pool_index = 0
 
-    def _initialize_env_pool(self):
-        print(f"Creating environment pool with {self.env_pool_size} environments...")
-        for _ in range(self.env_pool_size):
-            new_env = BoxMoveEnvGym(
-                horizon=self.env.horizon, 
-                gamma=self.env.gamma, 
-                n_boxes=self.env.n_boxes
-            )
-            new_env.reset()
-            self.env_pool.append(new_env)
-        print("Environment pool created.")
-    
-    def _get_env_from_pool(self):
-        env = self.env_pool[self.env_pool_index]
-        self.env_pool_index = (self.env_pool_index + 1) % self.env_pool_size
-        return env
-    
     def _setup_action_mapping(self):
         self._action_to_idx = {}
         self._idx_to_action = {}
@@ -505,52 +423,42 @@ class OptimizedDQN:
     
     def reward_shaping(self, obs, action, reward, next_obs, done):
         """
-        Apply reward shaping to provide denser rewards
+        Apply reward shaping to sparse rewards to improve learning
         """
         if not self.use_reward_shaping:
             return reward
             
-        shaped_reward = reward
-        
-        # If episode is done with positive reward, give a bonus for faster completion
-        if done and reward > 0:
-            # Bonus for completing episode quickly
-            time_bonus = max(0, 1.0 - self.episode_timesteps / self.env.horizon)
-            shaped_reward += time_bonus * 0.5
-        
-        # Extract state information
-        state_zone0 = obs["state_zone0"]
+        # If already receiving a reward, keep it
+        if reward > 0:
+            return reward
+            
+        # Check if the agent moved any box to zone 1
         state_zone1 = obs["state_zone1"]
-        next_state_zone0 = next_obs["state_zone0"]
         next_state_zone1 = next_obs["state_zone1"]
         
-        # Bonus for moving boxes to zone1 (count non-zero elements in zone1)
-        current_zone1_boxes = np.sum(state_zone1 > 0)
-        next_zone1_boxes = np.sum(next_state_zone1 > 0)
+        # Count boxes in zone 1
+        current_boxes = np.sum(state_zone1)
+        next_boxes = np.sum(next_state_zone1)
         
-        # Reward for moving boxes to zone1
-        if next_zone1_boxes > current_zone1_boxes:
-            shaped_reward += 0.2  # Small bonus for each box moved to zone1
+        # If more boxes in zone 1, give bonus
+        if next_boxes > current_boxes:
+            bonus = 0.1 * (next_boxes - current_boxes)
+            return reward + bonus
+            
+        # If the agent is near a box, give a small reward
+        action_zone0 = obs["action_zone0"]
+        if np.sum(action_zone0) > 0:  # There's a box at the action location
+            return reward + 0.05
         
-        # Encourage actions that lead to progress
-        if not done and shaped_reward == 0:
-            shaped_reward += 0.01  # Small reward for each step to encourage exploration
-        
-        return shaped_reward
-
+        return reward
+    
     def train(self):
         if self.num_timesteps < self.learning_starts or len(self.replay_buffer) < self.batch_size:
             return 0.0
         
-        # Get current beta value for importance sampling (if using prioritized replay)
-        if self.use_prioritized_replay:
-            beta = self.replay_buffer.update_beta(self.num_timesteps)
-            sample = self.replay_buffer.sample(self.batch_size, beta)
-            weights = sample["weights"].reshape(-1, 1)
-            indices = sample["indices"]
-        else:
-            sample = self.replay_buffer.sample(self.batch_size)
-            weights = torch.ones(self.batch_size, 1, device=self.device)
+        # Sample from replay buffer
+        sample = self.replay_buffer.sample(self.batch_size)
+        weights = torch.ones(self.batch_size, 1, device=self.device)
             
         obs = sample["obs"]
         next_obs = sample["next_obs"]
@@ -729,14 +637,8 @@ class OptimizedDQN:
         torch.nn.utils.clip_grad_norm_(self.q_network.parameters(), max_norm=10)
         self.optimizer.step()
         
-        # Update priorities in the replay buffer if using prioritized replay
-        if self.use_prioritized_replay:
-            # Convert TD errors to priorities (small constant added for stability)
-            new_priorities = (td_errors.cpu().numpy() + 1e-6) ** self.alpha
-            self.replay_buffer.update_priorities(indices, new_priorities)
-        
         avg_loss = total_loss / self.batch_size
-        self.losses.append(avg_loss)
+        self.loss_history.append(avg_loss)
         return avg_loss
 
     def learn(self, total_timesteps, eval_freq=10000, log_freq=1000):
@@ -770,25 +672,12 @@ class OptimizedDQN:
             action, info = self._select_action(obs)
             next_obs, reward, terminated, truncated, info = self.env.step(action)
             
-            # Apply reward shaping if enabled
-            if self.use_reward_shaping:
-                shaped_reward = self.reward_shaping(obs, action, reward, next_obs, terminated or truncated)
-            else:
-                shaped_reward = reward
-            
             # Track rewards and action validity
             rewards_history.append(reward)  # Track original reward for stats
             recent_rewards.append(reward)
-            if len(recent_rewards) > 100:
-                recent_rewards.pop(0)
-            
-            if reward == -1:  # Invalid action penalty
-                invalid_actions_count += 1
-            else:
-                valid_actions_count += 1
-            
+
             done = terminated or truncated
-            self.replay_buffer.add(obs, next_obs, action, shaped_reward, done, info)
+            self.replay_buffer.add(obs, next_obs, action, reward, done, info)
             obs = next_obs
             self.num_timesteps += 1
             self.episode_timesteps += 1
@@ -810,7 +699,7 @@ class OptimizedDQN:
                         self.target_q_network.load_state_dict(self.q_network.state_dict())
             
             if self.num_timesteps % log_freq == 0:
-                avg_loss = np.mean(self.losses[-100:]) if self.losses else 0
+                avg_loss = np.mean(self.loss_history[-100:]) if self.loss_history else 0
                 avg_recent_reward = np.mean(recent_rewards) if recent_rewards else 0
                 invalid_action_rate = invalid_actions_count / max(1, (invalid_actions_count + valid_actions_count))
                 
@@ -818,7 +707,7 @@ class OptimizedDQN:
                 fps = int(self.num_timesteps / elapsed_time)
                 log_msg = (
                     f"Steps: {self.num_timesteps} | "
-                    f"Episodes: {self.total_episodes} | "
+                    f"Episodes: {self.num_episodes} | "
                     f"Avg Loss: {avg_loss:.5f} | "
                     f"Avg Reward: {avg_recent_reward:.5f} | "
                     f"Invalid Actions: {invalid_action_rate:.2%} | "
@@ -836,14 +725,14 @@ class OptimizedDQN:
                 self.evaluate(num_episodes=5)
             
             if done:
-                self.total_episodes += 1
+                self.num_episodes += 1
                 self.episode_rewards.append(self.last_episode_reward)
                 self.episode_lengths.append(self.episode_timesteps)
                 
                 # Track episode returns for learning curve
-                self.episode_returns.append(self.last_episode_reward)
-                if len(self.episode_returns) > 0:
-                    self.moving_avg_return = np.mean(self.episode_returns[-100:])
+                self.reward_history.append(self.last_episode_reward)
+                if len(self.reward_history) > 0:
+                    self.moving_avg_return = np.mean(self.reward_history[-100:])
                 
                 # For successful episodes, perform additional training
                 if self.last_episode_reward > 0 and self.num_timesteps > self.learning_starts:
@@ -861,7 +750,7 @@ class OptimizedDQN:
                         print(f"\nNew best return: {self.best_return:.2f}, model saved to {model_path}")
                 
                 # Print episode summary
-                print(f"\nEpisode {self.total_episodes} completed: "
+                print(f"\nEpisode {self.num_episodes} completed: "
                       f"Reward={self.last_episode_reward:.2f}, "
                       f"Length={self.episode_timesteps}, "
                       f"Moving Avg={self.moving_avg_return:.2f}, "
@@ -889,7 +778,11 @@ class OptimizedDQN:
             gamma=self.env.gamma, 
             n_boxes=self.env.n_boxes
         )
-        for i in range(num_episodes):
+        
+        # Add progress bar for evaluation
+        eval_progress = tqdm(range(num_episodes), desc="Evaluation Progress")
+        
+        for i in eval_progress:
             obs = eval_env.reset()
             done = False
             episode_reward = 0
@@ -945,12 +838,17 @@ class OptimizedDQN:
                 
                 # Break if we're in an invalid state somehow
                 if reward == -1:
-                    print(f"  Warning: Invalid action detected in evaluation (episode {i+1})")
+                    eval_progress.write(f"  Warning: Invalid action detected in evaluation (episode {i+1})")
                     break
             
             total_rewards.append(episode_reward)
             episode_lengths.append(episode_steps)
-            print(f"  Episode {i+1}/{num_episodes}: Reward = {episode_reward:.2f}, Length = {episode_steps}")
+            
+            # Update progress bar description with current episode result
+            eval_progress.set_description(f"Eval: Episode {i+1}/{num_episodes}, Reward: {episode_reward:.2f}")
+            
+            # Use tqdm.write instead of print to avoid breaking the progress bar
+            eval_progress.write(f"  Episode {i+1}/{num_episodes}: Reward = {episode_reward:.2f}, Length = {episode_steps}")
         
         mean_reward = np.mean(total_rewards)
         mean_length = np.mean(episode_lengths)
@@ -959,7 +857,7 @@ class OptimizedDQN:
     
     def plot_learning_curve(self, save_path=None):
         """Plot the learning curve showing reward and loss over time."""
-        if not self.episode_returns:
+        if not self.reward_history:
             print("No training data to plot.")
             return
         
@@ -969,14 +867,14 @@ class OptimizedDQN:
         fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(10, 12), sharex=True)
         
         # Plot episode returns
-        episodes = range(1, len(self.episode_returns) + 1)
-        ax1.plot(episodes, self.episode_returns, 'b-', alpha=0.3, label='Episode Return')
+        episodes = range(1, len(self.reward_history) + 1)
+        ax1.plot(episodes, self.reward_history, 'b-', alpha=0.3, label='Episode Return')
         
         # Calculate and plot moving average
-        if len(self.episode_returns) >= 10:
-            window_size = min(100, len(self.episode_returns) // 10)
-            moving_avg = [np.mean(self.episode_returns[max(0, i-window_size):i+1]) 
-                         for i in range(len(self.episode_returns))]
+        if len(self.reward_history) >= 10:
+            window_size = min(100, len(self.reward_history) // 10)
+            moving_avg = [np.mean(self.reward_history[max(0, i-window_size):i+1]) 
+                         for i in range(len(self.reward_history))]
             ax1.plot(episodes, moving_avg, 'r-', label=f'Moving Average ({window_size} episodes)')
         
         ax1.set_title('Training Rewards')
@@ -985,15 +883,15 @@ class OptimizedDQN:
         ax1.grid(True, alpha=0.3)
         
         # Plot losses if available
-        if self.losses:
-            steps = range(1, len(self.losses) + 1)
-            ax2.plot(steps, self.losses, 'g-', alpha=0.3, label='Loss')
+        if self.loss_history:
+            steps = range(1, len(self.loss_history) + 1)
+            ax2.plot(steps, self.loss_history, 'g-', alpha=0.3, label='Loss')
             
             # Calculate and plot moving average of losses
-            if len(self.losses) >= 10:
-                window_size = min(100, len(self.losses) // 10)
-                moving_avg_loss = [np.mean(self.losses[max(0, i-window_size):i+1]) 
-                                for i in range(len(self.losses))]
+            if len(self.loss_history) >= 10:
+                window_size = min(100, len(self.loss_history) // 10)
+                moving_avg_loss = [np.mean(self.loss_history[max(0, i-window_size):i+1]) 
+                                for i in range(len(self.loss_history))]
                 ax2.plot(steps, moving_avg_loss, 'm-', label=f'Moving Average Loss ({window_size} steps)')
             
             ax2.set_title('Training Loss')
@@ -1003,7 +901,7 @@ class OptimizedDQN:
             ax2.grid(True, alpha=0.3)
             
             # Use logarithmic scale for losses if there's a wide range
-            if max(self.losses) / (min(self.losses) + 1e-10) > 100:
+            if max(self.loss_history) / (min(self.loss_history) + 1e-10) > 100:
                 ax2.set_yscale('log')
         
         plt.tight_layout()
@@ -1023,8 +921,9 @@ class OptimizedDQN:
             'optimizer': self.optimizer.state_dict(),
             'training_stats': {
                 'num_timesteps': self.num_timesteps,
-                'total_episodes': self.total_episodes,
-                'losses': self.losses,
+                'total_episodes': self.num_episodes,
+                'loss_history': self.loss_history,
+                'reward_history': self.reward_history,
                 'episode_rewards': self.episode_rewards,
                 'episode_lengths': self.episode_lengths,
                 'exploration_rate': self.exploration_rate
@@ -1043,9 +942,16 @@ class OptimizedDQN:
         self.optimizer.load_state_dict(state_dict['optimizer'])
         training_stats = state_dict.get('training_stats', {})
         self.num_timesteps = training_stats.get('num_timesteps', 0)
-        self.total_episodes = training_stats.get('total_episodes', 0)
-        self.losses = training_stats.get('losses', [])
+        self.num_episodes = training_stats.get('total_episodes', 0)
+        self.loss_history = training_stats.get('loss_history', [])
+        self.reward_history = training_stats.get('reward_history', [])
         self.episode_rewards = training_stats.get('episode_rewards', [])
         self.episode_lengths = training_stats.get('episode_lengths', [])
         self.exploration_rate = training_stats.get('exploration_rate', self.exploration_initial_eps)
-        print(f"Model loaded from {path} (timesteps: {self.num_timesteps}, episodes: {self.total_episodes})")
+        print(f"Model loaded from {path} (timesteps: {self.num_timesteps}, episodes: {self.num_episodes})")
+
+    def _get_env_from_pool(self):
+        """Get an environment from the pool."""
+        env = self.env_pool[self.env_pool_index]
+        self.env_pool_index = (self.env_pool_index + 1) % len(self.env_pool)
+        return env

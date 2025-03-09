@@ -6,10 +6,16 @@ import numpy as np
 import time
 import random
 import matplotlib.pyplot as plt
-from Box import Box
-from BoxAction import BoxAction
-from BoxMoveEnvGym import BoxMoveEnvGym
-from Constants import ZONE0, ZONE1
+import sys
+import os
+
+# Add the parent directory to the path so we can import from src
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+from src.Box import Box
+from src.BoxAction import BoxAction
+from src.BoxMoveEnvGym import BoxMoveEnvGym
+from src.Constants import ZONE0, ZONE1
 
 def test_initialization():
     """Test environment initialization with different parameters."""

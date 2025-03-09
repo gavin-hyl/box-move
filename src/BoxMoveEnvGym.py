@@ -6,10 +6,15 @@ import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d.art3d import Poly3DCollection
 import matplotlib.cm as cm
 import matplotlib.colors as mcolors
+import sys
+import os
 
-from Box import Box
-from BoxAction import BoxAction
-from Constants import ZONE0, ZONE1, zone0_dense_cpy, zone1_dense_cpy, BOX_DIM
+# Add the parent directory to the path so we can import from src
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+from src.Box import Box
+from src.BoxAction import BoxAction
+from src.Constants import ZONE0, ZONE1, zone0_dense_cpy, zone1_dense_cpy, BOX_DIM
 
 class BoxMoveEnvGym(gym.Env):
     """
@@ -322,7 +327,7 @@ class BoxMoveEnvGym(gym.Env):
             density_zone1 = box.val_density()
         zone0_dense = zone0_dense_cpy()
         zone1_dense = zone1_dense_cpy()
-        from Constants import ZONE0, ZONE1
+        from src.Constants import ZONE0, ZONE1
         for offset in np.ndindex(s):
             idx0 = tuple(np.add(p_from, offset))
             idx1 = tuple(np.add(p_to, offset))

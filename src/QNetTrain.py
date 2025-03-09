@@ -4,9 +4,14 @@ import time
 import matplotlib.pyplot as plt
 import numpy as np
 import random
+from tqdm import tqdm
+import sys
 
-from BoxMoveEnvGym import BoxMoveEnvGym
-from optimized_dqn import OptimizedDQN
+# Add the parent directory to the path so we can import from src
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+from src.BoxMoveEnvGym import BoxMoveEnvGym
+from src.OptimizedDQN import OptimizedDQN
 
 def parse_args():
     parser = argparse.ArgumentParser(description="Train a DQN agent on the BoxMoveEnv")
@@ -64,10 +69,6 @@ def main():
         device=args.device,
         seed=args.seed,
         env_pool_size=args.env_pool_size,
-        # Use simple configuration - no advanced features
-        use_prioritized_replay=False,
-        use_dueling_network=False,
-        use_reward_shaping=False,
         double_q=False
     )
     
@@ -113,7 +114,7 @@ def quick_test():
     # Initialize environment with simple settings
     env = BoxMoveEnvGym(
         horizon=20,
-        n_boxes=3,
+        n_boxes=8,
         seed=42
     )
     
@@ -132,9 +133,6 @@ def quick_test():
         device="auto",
         seed=42,
         env_pool_size=4,
-        use_prioritized_replay=False,
-        use_dueling_network=False,
-        use_reward_shaping=False,
         double_q=False
     )
     
@@ -152,17 +150,13 @@ def quick_test():
     print(f"Evaluation results: Mean reward: {mean_reward:.2f}, Mean episode length: {mean_length:.2f}")
     print("Quick test complete! Model saved to quick_test_model.pt")
 
-def compare_dqn_with_random(env=None, dqn=None):
-    """Compare DQN policy against a random policy that selects from valid actions"""
+def compare_dqn_with_random(env=None, dqn=None, n_episodes=50, horizon=25, n_boxes=6, seed=42):
+    """
+    Compare DQN policy against a random policy
+    """
     print("Comparing DQN policy against random policy (sampling from valid actions)...")
     
-    # Environment configuration
-    n_boxes = 6  # More boxes for increased complexity
-    horizon = 30  # Longer horizon for more complex sequences
-    n_episodes = 50  # Robust evaluation
-    seed = 123  # Different seed
-    
-    # Create environment if not provided
+    # Initialize environment if not provided
     if env is None:
         env = BoxMoveEnvGym(horizon=horizon, n_boxes=n_boxes, seed=seed)
         print(f"Created environment with {n_boxes} boxes and horizon {horizon}")
@@ -183,9 +177,7 @@ def compare_dqn_with_random(env=None, dqn=None):
             device="auto",
             seed=seed,
             env_pool_size=4,
-            use_prioritized_replay=False,
-            use_dueling_network=False,
-            use_reward_shaping=False
+            double_q=False
         )
         
         # Try to load a pre-trained model
@@ -215,8 +207,10 @@ def compare_dqn_with_random(env=None, dqn=None):
     dqn_rewards = []
     dqn_lengths = []
     
-    for i in range(n_episodes):
-        print(f"Episode {i+1}/{n_episodes}", end="\r")
+    # Add progress bar for DQN evaluation
+    dqn_eval_progress = tqdm(range(n_episodes), desc="DQN Evaluation")
+    
+    for i in dqn_eval_progress:
         obs = env.reset(seed=seed+i)  # Different seed for each episode
         episode_reward = 0
         episode_length = 0
@@ -237,14 +231,19 @@ def compare_dqn_with_random(env=None, dqn=None):
         
         dqn_rewards.append(episode_reward)
         dqn_lengths.append(episode_length)
+        
+        # Update progress bar description
+        dqn_eval_progress.set_description(f"DQN Eval: Episode {i+1}/{n_episodes}, Reward: {episode_reward:.2f}")
     
     # Evaluate random policy
     print("\nEvaluating random policy (sampling from valid actions)...")
     random_rewards = []
     random_lengths = []
     
-    for i in range(n_episodes):
-        print(f"Episode {i+1}/{n_episodes}", end="\r")
+    # Add progress bar for random policy evaluation
+    random_eval_progress = tqdm(range(n_episodes), desc="Random Policy Evaluation")
+    
+    for i in random_eval_progress:
         env.reset(seed=seed+i)  # Same seeds as DQN evaluation
         episode_reward = 0
         episode_length = 0
@@ -279,6 +278,9 @@ def compare_dqn_with_random(env=None, dqn=None):
         
         random_rewards.append(episode_reward)
         random_lengths.append(episode_length)
+        
+        # Update progress bar description
+        random_eval_progress.set_description(f"Random Eval: Episode {i+1}/{n_episodes}, Reward: {episode_reward:.2f}")
     
     # Calculate statistics
     dqn_mean_reward = np.mean(dqn_rewards)

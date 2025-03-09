@@ -12,13 +12,17 @@ import numpy as np
 import torch
 import matplotlib.pyplot as plt
 from tqdm import tqdm
+import sys
+
+# Add the parent directory to the path so we can import from src
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 # Import environment and model components
-from BoxMoveEnvGym import BoxMoveEnvGym
-from QNet import CNNQNetwork
-from Box import Box
-from BoxAction import BoxAction
-from Constants import ZONE0, ZONE1
+from src.BoxMoveEnvGym import BoxMoveEnvGym
+from src.QNet import CNNQNetwork
+from src.Box import Box
+from src.BoxAction import BoxAction
+from src.Constants import ZONE0, ZONE1
 
 
 def ensure_5d_tensor(tensor):

@@ -1,5 +1,5 @@
 import numpy as np
-from Constants import GEOM_DIM
+from src.Constants import GEOM_DIM
 
 
 class Box:

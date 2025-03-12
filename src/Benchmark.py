@@ -84,7 +84,7 @@ class GreedyPolicy:
     
     def __init__(self, env):
         self.env = env
-        self.name = "Greedy Policy (Highest Value to Min Corner)"
+        self.name = "Greedy Policy"
     
     def select_action(self, obs):
         """
@@ -189,18 +189,37 @@ class DQNPolicy:
         # Set device
         self.device = torch.device(device if torch.cuda.is_available() else "cpu")
         
-        # Create and load the Q-network
-        self.q_network = CNNQNetwork().to(self.device)
-        
+        # Try to load the model - first try with CNNQNetwork, then with DuelingQNetwork
         try:
+            # First attempt with CNNQNetwork
+            from src.QNet import CNNQNetwork
+            self.q_network = CNNQNetwork().to(self.device)
+            
+            # Load model
+            print(f"Attempting to load model with CNNQNetwork architecture")
             checkpoint = torch.load(model_path, map_location=self.device)
             self.q_network.load_state_dict(checkpoint["q_network_state_dict"])
             self.q_network.eval()
-            print(f"Loaded DQN model from {model_path}")
-        except Exception as e:
-            print(f"Error loading DQN model: {e}")
-            # Initialize with random weights if loading fails
-            print("Using randomly initialized DQN model")
+            print(f"Model loaded from {model_path} using CNNQNetwork architecture")
+        except Exception as e1:
+            print(f"Error loading with CNNQNetwork: {e1}")
+            try:
+                # Second attempt with DuelingQNetwork
+                from src.QNet import DuelingQNetwork
+                self.q_network = DuelingQNetwork().to(self.device)
+                
+                # Load model
+                print(f"Attempting to load model with DuelingQNetwork architecture")
+                checkpoint = torch.load(model_path, map_location=self.device)
+                self.q_network.load_state_dict(checkpoint["q_network_state_dict"])
+                self.q_network.eval()
+                print(f"Model loaded from {model_path} using DuelingQNetwork architecture")
+            except Exception as e2:
+                print(f"Error loading with DuelingQNetwork: {e2}")
+                # Initialize with random weights if loading fails
+                print("Using randomly initialized DQN model")
+                from src.QNet import CNNQNetwork
+                self.q_network = CNNQNetwork().to(self.device)
     
     def select_action(self, obs):
         """
@@ -516,7 +535,7 @@ def main():
             f.write(f"  Occupancy distribution: min={min(metrics['occupancies']):.2f}, max={max(metrics['occupancies']):.2f}\n\n")
     
     print("\nBenchmark completed!")
-    print(f"Results saved to benchmark_results/")
+    print("Results saved to benchmark_results/")
 
 
 if __name__ == "__main__":

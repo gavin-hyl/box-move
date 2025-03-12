@@ -10,10 +10,10 @@ VAL_IDX = ZONE_IDX + 1
 BOX_DIM = VAL_IDX + 1
 
 REMOVE_DIR = 2  # 0, 1, 2 for x, y, z
-ZONE0 = (3, 4, 5)
-ZONE1 = (4, 3, 3)
-# ZONE0 = (5, 6, 7)
-# ZONE1 = (4, 5, 6)
+# Modified zone dimensions to make the problem more challenging
+# Original: ZONE0 = (3, 4, 5) and ZONE1 = (4, 3, 3)
+ZONE0 = (4, 5, 5)  # Larger source zone - more boxes and more options
+ZONE1 = (3, 3, 4)  # Smaller target zone - more careful packing needed
 ZONE_SIZES = [ZONE0, ZONE1]
 def zone0_dense_cpy():
     return np.zeros(ZONE0, dtype=int)
@@ -31,6 +31,11 @@ DIRECTIONS = ['x', 'y', 'z']
 #==========================================================
 MODEL_DIR = "models"
 DATA_DIR = "data"
+
+# Rewards for different actions
+MOVE_REWARD = 0.1       # Small reward for any valid move
+SUCCESS_REWARD = 1.0    # Reward for successfully moving a box to zone 1
+COMPLETION_REWARD = 5.0 # Reward for optimal placement of all boxes
 
 # print("===================================================")
 # print("Constants:")

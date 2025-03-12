@@ -115,9 +115,9 @@ class BoxMoveEnvGym(gym.Env):
                 self.boxes.append(candidate_box)
                 self.add_box_to_zone(candidate_box)
 
-        if tries == max_tries:
-            print(f"Could not generate a valid initial state with {n_boxes} boxes")
-            print(f"Generated {len(self.boxes)} boxes instead")
+        # if tries == max_tries:
+        #     print(f"Could not generate a valid initial state with {n_boxes} boxes")
+        #     print(f"Generated {len(self.boxes)} boxes instead")
 
         self.t = 0
         self.valid_actions = []
